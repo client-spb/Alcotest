@@ -26,9 +26,9 @@ import kras.example.many.Screen.Main.NumberPickerSheet
 fun DrinksItem(
     config: DrinkConfig,
     amount: Float,
-    degrees: Int,
+    degrees: Float,
     onAmountChange: (Float) -> Unit,
-    onDegreesChange: (Int) -> Unit,
+    onDegreesChange: (Float) -> Unit,
 ) {
     val displayDegrees = degrees.coerceIn(config.minDegrees, config.maxDegrees)
     var showDegreesPicker by remember { mutableStateOf(false) }
@@ -43,7 +43,11 @@ fun DrinksItem(
             onDismiss = { showDegreesPicker = false },
             onConfirm = { newValue ->
                 onDegreesChange(newValue)
-                DrinkParamsStorage.saveDegrees(config.id, newValue)
+                if (config.id == "beer") {
+                    DrinkParamsStorage.saveDegreesFloat(config.id, newValue)
+                } else {
+                    DrinkParamsStorage.saveDegrees(config.id, newValue.toInt())
+                }
                 showDegreesPicker = false
             }
         )

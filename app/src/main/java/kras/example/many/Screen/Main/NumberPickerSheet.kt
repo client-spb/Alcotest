@@ -33,17 +33,17 @@ import kras.example.many.MyTxt
 @Composable
 fun NumberPickerSheet(
     title: String,
-    initialValue: Int,
-    minValue: Int,
-    maxValue: Int,
+    initialValue: Float,
+    minValue: Float,
+    maxValue: Float,
     unit: String? = null,
     step: Float = 1f,
     onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit,
+    onConfirm: (Float) -> Unit,
 ) {
-    var selectedValue by remember { mutableStateOf(initialValue.coerceIn(minValue, maxValue).toFloat()) }
+    var selectedValue by remember { mutableStateOf(initialValue.coerceIn(minValue, maxValue)) }
     val listState = rememberLazyListState()
-    val showQuickGrid = maxValue - minValue <= 20 && step >= 1f
+    val showQuickGrid = (maxValue - minValue) <= 20 && step >= 1f
 
     LaunchedEffect(initialValue) {
         val scrollIndex = (selectedValue - minValue).toInt()
@@ -55,7 +55,7 @@ fun NumberPickerSheet(
     PickerBottomSheet(
         title = title,
         onDismiss = onDismiss,
-        onConfirm = { onConfirm(selectedValue.toInt()) }
+        onConfirm = { onConfirm(selectedValue) }
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -76,8 +76,8 @@ fun NumberPickerSheet(
         if (showQuickGrid) {
             MySpacer(height = 16)
             QuickValueGrid(
-                minValue = minValue,
-                maxValue = maxValue,
+                minValue = minValue.toInt(),
+                maxValue = maxValue.toInt(),
                 selectedValue = selectedValue.toInt(),
                 onSelect = { selectedValue = it.toFloat() }
             )
@@ -90,8 +90,10 @@ fun NumberPickerSheet(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 state = listState
             ) {
-                items(maxValue - minValue + 1) { index ->
-                    val value = minValue + index
+                val intMin = minValue.toInt()
+                val intMax = maxValue.toInt()
+                items(intMax - intMin + 1) { index ->
+                    val value = intMin + index
                     ValueListItem(
                         value = value,
                         unit = unit,
