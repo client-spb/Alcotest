@@ -14,9 +14,9 @@ data class DrinkConfig(
     val defaultAmount: Float,
     val step: Float,
     val minAmount: Float,
-    val defaultDegrees: Int,
-    val minDegrees: Int,
-    val maxDegrees: Int,
+    val defaultDegrees: Float,
+    val minDegrees: Float,
+    val maxDegrees: Float,
 ) {
     fun portionLabel(): String = formatAmount(portionSize, withUnit = true, shortUnit = true)
 
@@ -44,9 +44,9 @@ object DrinksCatalog {
         defaultAmount = 0f,
         step = 0.5f,
         minAmount = 0f,
-        defaultDegrees = 5,
-        minDegrees = 2,
-        maxDegrees = 12,
+        defaultDegrees = 5.0f,
+        minDegrees = 2.0f,
+        maxDegrees = 12.0f,
     )
 
     val wine = DrinkConfig(
@@ -58,9 +58,9 @@ object DrinksCatalog {
         defaultAmount = 0f,
         step = 150f,
         minAmount = 0f,
-        defaultDegrees = 12,
-        minDegrees = 8,
-        maxDegrees = 18,
+        defaultDegrees = 12.0f,
+        minDegrees = 8.0f,
+        maxDegrees = 18.0f,
     )
 
     val spirits = DrinkConfig(
@@ -72,9 +72,9 @@ object DrinksCatalog {
         defaultAmount = 0f,
         step = 50f,
         minAmount = 0f,
-        defaultDegrees = 40.coerceIn(wine.maxDegrees, 99),
+        defaultDegrees = 40.0f.coerceIn(wine.maxDegrees, 99f),
         minDegrees = wine.maxDegrees,
-        maxDegrees = 99,
+        maxDegrees = 99f,
     )
 
     val all = listOf(beer, wine, spirits)

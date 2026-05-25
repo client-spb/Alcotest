@@ -9,7 +9,7 @@ data class CalculationInput(
     val startTime: LocalTime,
     val endTime: LocalTime,
     val drinkAmounts: Map<String, Float>,
-    val drinkDegrees: Map<String, Int>,
+    val drinkDegrees: Map<String, Float>,
 )
 
 data class EliminationPoint(

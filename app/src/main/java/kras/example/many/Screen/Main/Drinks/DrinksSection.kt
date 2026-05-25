@@ -24,9 +24,9 @@ import kras.example.many.Screen.Main.SectionCard
 @Composable
 fun DrinksSection(
     amounts: Map<String, Float>,
-    degrees: Map<String, Int>,
+    degrees: Map<String, Float>,
     onAmountChange: (drinkId: String, amount: Float) -> Unit,
-    onDegreesChange: (drinkId: String, degrees: Int) -> Unit,
+    onDegreesChange: (drinkId: String, degrees: Float) -> Unit,
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
 

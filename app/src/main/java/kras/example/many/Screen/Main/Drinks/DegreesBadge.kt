@@ -15,7 +15,7 @@ import kras.example.many.Color.MyColor
 import kras.example.many.MyTxt
 
 @Composable
-fun DegreesBadge(value: Int, onClick: () -> Unit = {}) {
+fun DegreesBadge(value: Float, onClick: () -> Unit = {}) {
     Box(
         modifier = Modifier
             .clip(CircleShape)
@@ -25,6 +25,7 @@ fun DegreesBadge(value: Int, onClick: () -> Unit = {}) {
             .clickable { onClick() },
         contentAlignment = Alignment.Center,
     ) {
-        MyTxt(text = "$value%", color = MyColor.TITLE, fontSize = 11)
+        val displayValue = String.format(java.util.Locale.US, "%.1f", value).removeSuffix(".0")
+        MyTxt(text = "$displayValue%", color = MyColor.TITLE, fontSize = 11)
     }
 }

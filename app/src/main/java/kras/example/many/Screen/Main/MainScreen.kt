@@ -84,7 +84,7 @@ fun MainScreen(modifier: Modifier) {
 
                 val default = config.defaultDegrees.coerceIn(config.minDegrees, config.maxDegrees)
 
-                val stored = DrinkParamsStorage.getDegrees(config.id, default)
+                val stored = DrinkParamsStorage.getDegreesFloat(config.id, default)
 
                 config.id to stored.coerceIn(config.minDegrees, config.maxDegrees)
 
@@ -126,19 +126,19 @@ fun MainScreen(modifier: Modifier) {
 
             title = "Возраст",
 
-            initialValue = age,
+            initialValue = age.toFloat(),
 
-            minValue = 18,
+            minValue = 18f,
 
-            maxValue = 120,
+            maxValue = 120f,
 
             onDismiss = { showAgePicker = false },
 
             onConfirm = { newValue ->
 
-                age = newValue
+                age = newValue.toInt()
 
-                UserParamsStorage.saveAge(newValue)
+                UserParamsStorage.saveAge(newValue.toInt())
 
                 showAgePicker = false
 
@@ -156,11 +156,11 @@ fun MainScreen(modifier: Modifier) {
 
             title = "Вес",
 
-            initialValue = weight,
+            initialValue = weight.toFloat(),
 
-            minValue = 20,
+            minValue = 20f,
 
-            maxValue = 300,
+            maxValue = 300f,
 
             unit = "кг",
 
@@ -168,9 +168,9 @@ fun MainScreen(modifier: Modifier) {
 
             onConfirm = { newValue ->
 
-                weight = newValue
+                weight = newValue.toInt()
 
-                UserParamsStorage.saveWeight(newValue)
+                UserParamsStorage.saveWeight(newValue.toInt())
 
                 showWeightPicker = false
 
