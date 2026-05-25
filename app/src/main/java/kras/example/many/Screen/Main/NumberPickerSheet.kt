@@ -112,12 +112,13 @@ private fun ColumnCenterValue(value: Float, unit: String?, step: Float) {
         modifier = Modifier.padding(horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        val displayValue = if (step < 1f) {
-            String.format(java.util.Locale.US, "%.1f", value).toFloat()
+        val display = if (step < 1f) {
+            val formatted = String.format(java.util.Locale.US, "%.1f", value)
+            if (unit != null) "$formatted $unit" else formatted
         } else {
-            value.toInt().toFloat()
+            val intValue = value.toInt()
+            if (unit != null) "$intValue $unit" else intValue.toString()
         }
-        val display = if (unit != null) "$displayValue $unit" else displayValue.toString()
         MyTxt(
             text = display,
             fontSize = 40,
