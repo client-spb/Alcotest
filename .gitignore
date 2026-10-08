@@ -1,1 +1,12 @@
-Nothing should be ignored based on the provided file changes, as only a Kotlin source file was modified and no build artifacts, dependencies, or temporary files were included in the changes.
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+/app/release
