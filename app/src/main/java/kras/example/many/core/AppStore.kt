@@ -3,22 +3,31 @@ package kras.example.many.core
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.edit
 import kras.example.many.ui.theme.ThemeId
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneId
+
+/** Напиток в черновике расчёта (шаг 1). */
+data class DraftDrink(val id: Long, val type: DrinkType, val volumeMl: Int, val abv: Float, val count: Int)
 
 /** Единое состояние приложения с сохранением в SharedPreferences. */
 object AppStore {
     private const val PREFS = "alcotest_v2"
     private const val MAX_HISTORY = 30
+    const val STEP_DRINKS = 0
+    const val STEP_TIME = 1
+    const val STEP_PROFILE = 2
+    const val STEP_RESULT = 3
     private lateinit var prefs: SharedPreferences
 
     var profile by mutableStateOf(Profile())
-        private set
-    var drinks by mutableStateOf<List<DrinkEntry>>(emptyList())
         private set
     var stomach by mutableStateOf(Stomach.SNACK)
         private set
@@ -28,61 +37,107 @@ object AppStore {
         private set
     var disclaimerAccepted by mutableStateOf(false)
         private set
+
+    // ---- Мастер расчёта ----
+    var step by mutableIntStateOf(STEP_DRINKS)
+    var draft by mutableStateOf<List<DraftDrink>>(emptyList())
+        private set
+    /** Начало и конец застолья, минуты от полуночи. */
+    var startMin by mutableIntStateOf(0)
+        private set
+    var endMin by mutableIntStateOf(0)
+        private set
+    /** Напитки последнего расчёта с проставленным временем. */
+    var result by mutableStateOf<List<DrinkEntry>>(emptyList())
+        private set
+    /** Идёт расчёт (показ рекламы). */
+    var calculating by mutableStateOf(false)
+
     /** Последние выбранные объём/крепость для каждого напитка. */
     private val lastUsed = mutableMapOf<DrinkType, Pair<Int, Float>>()
 
     /** Всплывающее уведомление (тост) — читает корневой экран. */
     var toast by mutableStateOf<String?>(null)
-    /** Растёт при каждом изменении сессии — для показа межстраничной рекламы. */
-    var changeCounter by mutableStateOf(0)
-        private set
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        resetTimes()
         runCatching { load() }
         if (!prefs.contains("profile")) runCatching { migrateLegacy(context) }
+        step = if (result.isNotEmpty()) STEP_RESULT else STEP_DRINKS
     }
 
     fun updateProfile(p: Profile) { profile = p; save() }
-    fun updateStomach(s: Stomach) { stomach = s; touch() }
+    fun updateStomach(s: Stomach) { stomach = s; save() }
     fun updateTheme(t: ThemeId) { theme = t; save() }
     fun acceptDisclaimer() { disclaimerAccepted = true; save() }
+    fun updateStart(min: Int) { startMin = norm(min) }
+    fun updateEnd(min: Int) { endMin = norm(min) }
 
     fun lastFor(type: DrinkType): Pair<Int, Float> = lastUsed[type] ?: (type.defaultMl to type.defaultAbv)
 
-    fun addDrinks(type: DrinkType, volumeMl: Int, abv: Float, timeMs: Long, count: Int) {
-        val base = System.nanoTime()
-        drinks = drinks + List(count) { DrinkEntry(base + it, type, volumeMl, abv, timeMs) }
+    fun addDraft(type: DrinkType, volumeMl: Int, abv: Float, count: Int) {
+        draft = draft + DraftDrink(System.nanoTime(), type, volumeMl, abv, count)
         lastUsed[type] = volumeMl to abv
         toast = "${type.emoji} ${if (count > 1) "$count × " else ""}${type.title} добавлено"
-        touch()
+        save()
     }
 
-    fun removeDrink(id: Long) { drinks = drinks.filterNot { it.id == id }; touch() }
+    fun removeDraft(id: Long) { draft = draft.filterNot { it.id == id } }
 
-    /** Завершает сессию; при наличии напитков сохраняет её в историю. */
-    fun finishSession(nowMs: Long) {
-        if (drinks.isNotEmpty()) {
-            val f = BacEngine.compute(drinks, profile, stomach, nowMs)
+    /** Раскладывает порции равномерно по времени застолья и сохраняет результат в историю. */
+    fun calculate(nowMs: Long) {
+        val zone = ZoneId.systemDefault()
+        val today = LocalDate.now(zone)
+        fun ms(min: Int) = today.atTime(LocalTime.of(min / 60, min % 60)).atZone(zone).toInstant().toEpochMilli()
+        var start = ms(startMin)
+        var end = ms(endMin)
+        if (end < start) start -= DAY_MS
+        // Указанное время ещё не наступило — значит, пили вчера
+        if (end > nowMs + 30 * 60_000L) { start -= DAY_MS; end -= DAY_MS }
+
+        val portions = draft.flatMap { d -> List(d.count) { d } }
+        val n = portions.size
+        result = portions.mapIndexed { i, d ->
+            val t = if (n == 1) start else start + (end - start) * i / (n - 1)
+            DrinkEntry(d.id + i, d.type, d.volumeMl, d.abv, t)
+        }
+        if (result.isNotEmpty()) {
+            val f = BacEngine.compute(result, profile, stomach, nowMs)
             val record = SessionRecord(
-                startMs = drinks.minOf { it.timeMs },
-                endMs = drinks.maxOf { it.timeMs },
-                drinks = drinks.size,
-                totalMl = drinks.sumOf { it.volumeMl },
-                grams = drinks.sumOf { it.grams.toDouble() }.toFloat(),
+                startMs = start,
+                endMs = end,
+                drinks = n,
+                totalMl = result.sumOf { it.volumeMl },
+                grams = result.sumOf { it.grams.toDouble() }.toFloat(),
                 peak = f.peak,
-                emojis = drinks.map { it.type.emoji }.distinct().joinToString(""),
+                emojis = result.map { it.type.emoji }.distinct().joinToString(""),
             )
             history = (listOf(record) + history).take(MAX_HISTORY)
-            toast = "Сессия сохранена в историю"
         }
-        drinks = emptyList()
-        touch()
+        step = STEP_RESULT
+        save()
+    }
+
+    /** Начать новый расчёт с чистого листа. */
+    fun newCalculation() {
+        draft = emptyList()
+        result = emptyList()
+        resetTimes()
+        step = STEP_DRINKS
+        save()
     }
 
     fun clearHistory() { history = emptyList(); save() }
 
-    private fun touch() { changeCounter++; save() }
+    private fun resetTimes() {
+        val now = LocalTime.now()
+        val rounded = (now.hour * 60 + now.minute) / 15 * 15
+        endMin = rounded
+        startMin = norm(rounded - 120)
+    }
+
+    private fun norm(min: Int) = ((min % DAY_MIN) + DAY_MIN) % DAY_MIN
 
     private fun save() {
         if (!::prefs.isInitialized) return
@@ -92,7 +147,7 @@ object AppStore {
                 put("age", profile.age); put("limit", profile.driveLimit.toDouble())
             }.toString())
             putString("drinks", JSONArray().apply {
-                drinks.forEach { d ->
+                result.forEach { d ->
                     put(JSONObject().apply {
                         put("id", d.id); put("type", d.type.name); put("ml", d.volumeMl)
                         put("abv", d.abv.toDouble()); put("t", d.timeMs)
@@ -129,7 +184,7 @@ object AppStore {
         }
         prefs.getString("drinks", null)?.let {
             val a = JSONArray(it)
-            drinks = (0 until a.length()).mapNotNull { i ->
+            result = (0 until a.length()).mapNotNull { i ->
                 val o = a.getJSONObject(i)
                 val type = DrinkType.entries.firstOrNull { t -> t.name == o.optString("type") } ?: return@mapNotNull null
                 DrinkEntry(o.getLong("id"), type, o.getInt("ml"), o.getDouble("abv").toFloat(), o.getLong("t"))
@@ -170,4 +225,7 @@ object AppStore {
             age = old.getInt("age", profile.age),
         )
     }
+
+    private const val DAY_MIN = 24 * 60
+    private const val DAY_MS = 24 * 60 * 60_000L
 }

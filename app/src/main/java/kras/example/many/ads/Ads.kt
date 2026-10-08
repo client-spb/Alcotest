@@ -31,14 +31,14 @@ object AdIds {
     const val BANNER = "demo-banner-yandex"
 }
 
-/** Межстраничная реклама: заранее грузится, показывается не чаще раза в [COOLDOWN_MS]. */
+/** Межстраничная реклама: грузится заранее и показывается перед результатом расчёта. */
 object Interstitial {
-    private const val COOLDOWN_MS = 3 * 60_000L
-    private const val RETRY_MS = 60_000L
+    private const val RETRY_MS = 30_000L
+    private const val WAIT_MS = 5_000L
+    private const val POLL_MS = 250L
     private var loader: InterstitialAdLoader? = null
     private var ad: InterstitialAd? = null
     private var loading = false
-    private var lastShownMs = 0L
     private val handler = Handler(Looper.getMainLooper())
 
     fun preload(context: Context) {
@@ -59,24 +59,51 @@ object Interstitial {
         })
     }
 
-    /** Показывает рекламу, если она готова и прошло достаточно времени. */
-    fun maybeShow(activity: Activity) {
-        val now = System.currentTimeMillis()
-        val current = ad ?: return preload(activity)
-        if (now - lastShownMs < COOLDOWN_MS || activity.isFinishing || activity.isDestroyed) return
+    /**
+     * Показывает рекламу и вызывает [onDone] после её закрытия.
+     * Если реклама не успела загрузиться за [WAIT_MS] или не показалась — [onDone] вызывается сразу.
+     */
+    fun showThen(activity: Activity, onDone: () -> Unit) {
+        var finished = false
+        val finish = {
+            if (!finished) {
+                finished = true
+                onDone()
+            }
+        }
+        preload(activity)
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        val poll = object : Runnable {
+            override fun run() {
+                val ready = ad
+                when {
+                    activity.isFinishing || activity.isDestroyed -> finish()
+                    ready != null -> display(activity, ready, finish)
+                    System.currentTimeMillis() > deadline -> finish()
+                    else -> handler.postDelayed(this, POLL_MS)
+                }
+            }
+        }
+        poll.run()
+    }
+
+    private fun display(activity: Activity, current: InterstitialAd, finish: () -> Unit) {
         ad = null
-        lastShownMs = now
         current.setAdEventListener(object : InterstitialAdEventListener {
             override fun onAdShown() = Unit
-            override fun onAdFailedToShow(adError: AdError) { preload(activity) }
+            override fun onAdFailedToShow(adError: AdError) {
+                finish()
+                preload(activity)
+            }
             override fun onAdDismissed() {
                 current.setAdEventListener(null)
+                finish()
                 preload(activity)
             }
             override fun onAdClicked() = Unit
             override fun onAdImpression(impressionData: ImpressionData?) = Unit
         })
-        runCatching { current.show(activity) }.onFailure { preload(activity) }
+        runCatching { current.show(activity) }.onFailure { finish(); preload(activity) }
     }
 }
 

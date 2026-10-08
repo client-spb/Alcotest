@@ -1,8 +1,7 @@
-package kras.example.many.ui.tabs
+package kras.example.many.ui.calc
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
@@ -27,26 +24,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kras.example.many.core.AppStore
-import kras.example.many.core.BacEngine
 import kras.example.many.core.Profile
 import kras.example.many.ui.CardShape
 import kras.example.many.ui.Ic
-import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
-import kras.example.many.ui.PillGroup
 import kras.example.many.ui.PrimaryButton
 import kras.example.many.ui.SectionLabel
 import kras.example.many.ui.Sheet
 import kras.example.many.ui.Stepper
 import kras.example.many.ui.T
-import kras.example.many.ui.theme.ThemeId
 import kras.example.many.ui.theme.Ui
 import kotlin.math.roundToInt
 
@@ -56,65 +47,46 @@ private enum class Metric(val title: String, val unit: String, val min: Int, val
     AGE("Возраст", "лет", 18, 100),
 }
 
-private fun Profile.get(m: Metric) = when (m) { Metric.WEIGHT -> weightKg; Metric.HEIGHT -> heightCm; Metric.AGE -> age }
-private fun Profile.set(m: Metric, v: Int) = when (m) {
+private fun Profile.valueOf(m: Metric) = when (m) {
+    Metric.WEIGHT -> weightKg; Metric.HEIGHT -> heightCm; Metric.AGE -> age
+}
+
+private fun Profile.with(m: Metric, v: Int) = when (m) {
     Metric.WEIGHT -> copy(weightKg = v); Metric.HEIGHT -> copy(heightCm = v); Metric.AGE -> copy(age = v)
 }
 
 @Composable
-fun ProfileTab(onShareApp: () -> Unit, onRate: () -> Unit) {
+fun StepProfile() {
     val c = Ui.c
     val p = AppStore.profile
     var editing by remember { mutableStateOf<Metric?>(null) }
-    var about by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
+        SectionLabel("Пол")
         Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             GenderTile("♂", "Мужчина", p.male, Modifier.weight(1f)) { AppStore.updateProfile(p.copy(male = true)) }
             GenderTile("♀", "Женщина", !p.male, Modifier.weight(1f)) { AppStore.updateProfile(p.copy(male = false)) }
         }
+        Box(Modifier.size(14.dp))
+        SectionLabel("Параметры — нажмите, чтобы изменить")
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Metric.entries.forEach { m ->
                 Panel(Modifier.weight(1f), onClick = { editing = m }, padding = PaddingValues(14.dp)) {
                     T(m.title, 12.sp, color = c.textDim)
-                    T("${p.get(m)}", 26.sp, FontWeight.Black)
+                    T("${p.valueOf(m)}", 30.sp, FontWeight.Black)
                     T(m.unit, 12.sp, color = c.textDim)
                 }
             }
         }
-        Column {
-            SectionLabel("Лимит для вождения, ‰")
-            PillGroup(listOf(0f, 0.3f, 0.5f, 0.8f), p.driveLimit, { if (it == 0f) "0.0" else "$it" }, {
-                AppStore.updateProfile(p.copy(driveLimit = it))
-            }, Modifier.fillMaxWidth())
-            T("В России — 0.3 ‰ (0.16 мг/л в выдохе)", 11.sp, color = c.textDim, modifier = Modifier.padding(top = 6.dp))
-        }
-        Column {
-            SectionLabel("Оформление")
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                ThemeId.entries.forEach { t -> ThemeSwatch(t, t == AppStore.theme, Modifier.weight(1f)) { AppStore.updateTheme(t) } }
-            }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            PrimaryButton("Поделиться", onShareApp, Modifier.weight(1f), Ic.Share, secondary = true)
-            PrimaryButton("Оценить", onRate, Modifier.weight(1f), Ic.Star, secondary = true)
-            Box(Modifier.size(54.dp).clip(CircleShape).background(c.surfaceHigh).clickable { about = true }, contentAlignment = Alignment.Center) {
-                Icon(Ic.Info, null, tint = c.text, modifier = Modifier.size(22.dp))
-            }
-        }
-        Box(Modifier.size(2.dp))
+        T(
+            "Данные запоминаются — в следующий раз просто нажмите «Рассчитать»",
+            12.sp, color = c.textDim, align = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        )
     }
 
-    editing?.let { m -> MetricSheet(m, p.get(m), { AppStore.updateProfile(p.set(m, it)) }) { editing = null } }
-    if (about) {
-        val water = BacEngine.totalBodyWater(p)
-        InfoDialog(
-            "Как считаем",
-            "Формула Видмарка с поправкой Уотсона: учитываются пол, вес, рост и возраст " +
-                "(у вас ≈ ${water.roundToInt()} л воды в организме).\n\n" +
-                "Каждая порция всасывается 30–90 минут в зависимости от закуски, выведение — ${BacEngine.ELIMINATION_PER_HOUR} ‰/ч.\n\n" +
-                "Результат ориентировочный и не является медицинским или юридическим заключением.",
-        ) { about = false }
+    editing?.let { m ->
+        MetricSheet(m, p.valueOf(m), { AppStore.updateProfile(AppStore.profile.with(m, it)) }) { editing = null }
     }
 }
 
@@ -128,25 +100,8 @@ private fun GenderTile(symbol: String, title: String, active: Boolean, modifier:
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        T(symbol, 48.sp, FontWeight.Black, fg)
-        T(title, 15.sp, FontWeight.Bold, fg)
-    }
-}
-
-@Composable
-private fun ThemeSwatch(t: ThemeId, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    val c = Ui.c
-    val p = t.palette
-    Column(modifier.clickable(onClick = onClick), horizontalAlignment = Alignment.CenterHorizontally) {
-        Box(
-            Modifier.size(48.dp).clip(CircleShape)
-                .background(Brush.linearGradient(listOf(p.bg, p.bgGlow, p.accent)))
-                .border(if (active) 3.dp else 1.dp, if (active) c.accent else c.text.copy(alpha = 0.1f), CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (active) Icon(Ic.Check, null, tint = Color.White, modifier = Modifier.size(20.dp))
-        }
-        T(t.title, 11.sp, if (active) FontWeight.Bold else FontWeight.Normal, if (active) c.text else c.textDim, Modifier.padding(top = 4.dp), TextAlign.Center, 1)
+        T(symbol, 56.sp, FontWeight.Black, fg)
+        T(title, 16.sp, FontWeight.Bold, fg)
     }
 }
 

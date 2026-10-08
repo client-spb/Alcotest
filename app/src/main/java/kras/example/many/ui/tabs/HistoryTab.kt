@@ -35,7 +35,9 @@ import androidx.compose.ui.unit.sp
 import kras.example.many.core.AppStore
 import kras.example.many.core.BacEngine
 import kras.example.many.core.SessionRecord
+import kras.example.many.ui.EmptyState
 import kras.example.many.ui.Ic
+import kras.example.many.ui.ScreenHeader
 import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
@@ -56,7 +58,10 @@ private const val VISIBLE_ROWS = 3
 fun HistoryTab(onAddDrink: () -> Unit) {
     val history = AppStore.history
     if (history.isEmpty()) {
-        EmptyState("🗂️", "История пуста", "Завершите сессию на вкладке «Бар» — она сохранится здесь со статистикой.", "К напиткам", onAddDrink)
+        Column(Modifier.fillMaxSize()) {
+            ScreenHeader("История", "Ваши прошлые расчёты")
+            EmptyState("🗂️", "История пуста", "Каждый расчёт автоматически сохраняется здесь со статистикой.", "Новый расчёт", onAddDrink)
+        }
         return
     }
     val c = Ui.c
@@ -65,12 +70,14 @@ fun HistoryTab(onAddDrink: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     var tip by remember { mutableStateOf<String?>(null) }
 
+    Column(Modifier.fillMaxSize()) {
+    ScreenHeader("История", "Ваши прошлые расчёты")
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(Ic.History, "Сессий", "${history.size}", "всего", c.accent) { tip = "Сохраняются последние 30 сессий." }
+            StatTile(Ic.History, "Расчётов", "${history.size}", "всего", c.accent) { tip = "Сохраняются последние 30 расчётов." }
             val avg = history.map { it.peak }.average().toFloat()
             StatTile(Ic.Pulse, "Средний пик", "${fmtPromille(avg)} ‰", BacEngine.stateOf(avg).title, c.level(BacEngine.stateOf(avg).level)) {
-                tip = "Средняя пиковая концентрация по всем сохранённым сессиям."
+                tip = "Средняя пиковая концентрация по всем сохранённым расчётам."
             }
             val max = history.maxOf { it.peak }
             StatTile(Ic.Peak, "Рекорд", "${fmtPromille(max)} ‰", fmtDate(history.first { it.peak == max }.startMs), c.accent2) {
@@ -78,7 +85,7 @@ fun HistoryTab(onAddDrink: () -> Unit) {
             }
         }
         Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
-            T("Пики последних сессий", 15.sp, FontWeight.Bold)
+            T("Пики последних расчётов", 15.sp, FontWeight.Bold)
             Bars(history.take(8).reversed(), Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp)) { detail = it }
         }
         Column {
@@ -94,10 +101,11 @@ fun HistoryTab(onAddDrink: () -> Unit) {
         }
         Box(Modifier.size(4.dp))
     }
+    }
 
     detail?.let { DetailSheet(it) { detail = null } }
     if (showAll) {
-        Sheet({ showAll = false }, "Все сессии") {
+        Sheet({ showAll = false }, "Все расчёты") {
             LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(history) { r -> HistoryRow(r) { showAll = false; detail = r } }
             }
@@ -107,7 +115,7 @@ fun HistoryTab(onAddDrink: () -> Unit) {
     }
     if (confirmClear) {
         InfoDialog(
-            "Очистить историю?", "Все сохранённые сессии будут удалены без возможности восстановления.",
+            "Очистить историю?", "Все сохранённые расчёты будут удалены без возможности восстановления.",
             onDismiss = { confirmClear = false }, confirm = "Удалить", dismissText = "Отмена",
             onConfirm = { AppStore.clearHistory(); showAll = false },
         )

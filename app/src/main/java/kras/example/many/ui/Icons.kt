@@ -41,4 +41,12 @@ object Ic {
     val Flag = line("flag", "M5 21V4", "M5 4h11l-2 4 2 4H5")
     val Star = line("star", "M12 3l2.8 5.7 6.2 0.9 -4.5 4.4 1 6.2L12 17.3l-5.5 2.9 1 -6.2L3 9.6l6.2 -0.9z")
     val Chevron = line("chevron", "M9 6l6 6 -6 6")
+    val Next = line("next", "M5 12h14", "M13 6l6 6 -6 6")
+    val Back = line("back", "M19 12H5", "M11 6l-6 6 6 6")
+    val Clock = line("clock", "M12 21a9 9 0 1 0 0 -18a9 9 0 0 0 0 18z", "M12 7v5l3 2")
+    val Sliders = line(
+        "sliders", "M4 21v-7", "M4 10V3", "M12 21v-9", "M12 8V3", "M20 21v-5", "M20 12V3",
+        "M1 14h6", "M9 8h6", "M17 16h6",
+    )
+    val Refresh = line("refresh", "M3 12a9 9 0 0 1 15.5 -6.2L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1 -15.5 6.2L3 16", "M3 21v-5h5")
 }

@@ -1,4 +1,4 @@
-package kras.example.many.ui.tabs
+package kras.example.many.ui.calc
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import kras.example.many.core.AppStore
 import kras.example.many.core.BacEngine
 import kras.example.many.core.Forecast
@@ -40,7 +42,6 @@ import kras.example.many.ui.Ic
 import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
-import kras.example.many.ui.RoundIconButton
 import kras.example.many.ui.StatTile
 import kras.example.many.ui.T
 import kras.example.many.ui.fmtDayTime
@@ -52,12 +53,18 @@ import kras.example.many.ui.theme.Ui
 private enum class Tip { PEAK, DRIVE, SOBER }
 
 @Composable
-fun ForecastTab(forecast: Forecast, nowMs: Long, onAddDrink: () -> Unit, onShare: () -> Unit) {
-    if (forecast.isEmpty) {
-        EmptyState("📈", "Прогноз пуст", "Добавьте напитки — здесь появится график, пик и время, когда можно за руль.", "Добавить напиток", onAddDrink)
-        return
-    }
+fun StepResult(onShare: (Forecast) -> Unit) {
     val c = Ui.c
+    var nowMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(30_000)
+            nowMs = System.currentTimeMillis()
+        }
+    }
+    val forecast = remember(AppStore.result, AppStore.profile, AppStore.stomach, nowMs) {
+        BacEngine.compute(AppStore.result, AppStore.profile, AppStore.stomach, nowMs)
+    }
     var tip by remember { mutableStateOf<Tip?>(null) }
     val limit = AppStore.profile.driveLimit
 
@@ -66,11 +73,12 @@ fun ForecastTab(forecast: Forecast, nowMs: Long, onAddDrink: () -> Unit, onShare
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             StatTile(Ic.Peak, "Пик", "${fmtPromille(forecast.peak)} ‰", fmtTime(forecast.peakMs), c.accent2) { tip = Tip.PEAK }
             val drive = forecast.driveMs
+            val canDrive = drive == null || drive <= nowMs
             StatTile(
                 Ic.Car, "За руль",
-                if (drive == null || drive <= nowMs) "Можно*" else fmtDayTime(drive),
-                if (drive == null || drive <= nowMs) "ниже $limit ‰" else "через ${fmtDuration(drive - nowMs)}",
-                if (drive == null || drive <= nowMs) c.good else c.warn,
+                if (canDrive) "Можно*" else fmtDayTime(drive!!),
+                if (canDrive) "ниже $limit ‰" else "через ${fmtDuration(drive!! - nowMs)}",
+                if (canDrive) c.good else c.warn,
             ) { tip = Tip.DRIVE }
             val sober = forecast.soberMs
             StatTile(
@@ -81,25 +89,24 @@ fun ForecastTab(forecast: Forecast, nowMs: Long, onAddDrink: () -> Unit, onShare
             ) { tip = Tip.SOBER }
         }
         Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    T("Кривая выведения", 15.sp, FontWeight.Bold)
-                    T("пунктир — лимит $limit ‰", 11.sp, color = c.textDim)
-                }
-                RoundIconButton(Ic.Share, onShare, size = 38.dp)
-            }
-            Chart(forecast, nowMs, limit, Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp))
+            T("Как будет снижаться", 15.sp, FontWeight.Bold)
+            T("пунктир — лимит для вождения $limit ‰", 11.sp, color = c.textDim)
+            if (!forecast.isEmpty) Chart(forecast, nowMs, limit, Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PrimaryButton("Поделиться", { onShare(forecast) }, Modifier.weight(1f), Ic.Share, secondary = true)
+            PrimaryButton("Новый расчёт", AppStore::newCalculation, Modifier.weight(1f), Ic.Refresh)
         }
         T(
-            "* Расчёт ориентировочный и не заменяет алкотестер. Лучше не садиться за руль после алкоголя вовсе.",
-            10.sp, color = c.textDim, align = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            "* Расчёт ориентировочный и не заменяет алкотестер",
+            10.sp, color = c.textDim, align = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
         )
     }
 
     when (tip) {
-        Tip.PEAK -> InfoDialog("Пиковая концентрация", "Максимум ${fmtPromille(forecast.peak)} ‰ будет (или был) в ${fmtDayTime(forecast.peakMs)}. Алкоголь всасывается постепенно — чем плотнее закуска, тем ниже и позже пик.") { tip = null }
-        Tip.DRIVE -> InfoDialog("Когда за руль", "Время, когда уровень опустится ниже выбранного лимита $limit ‰. Лимит меняется во вкладке «Профиль». Индивидуальная скорость выведения может отличаться — всегда проверяйтесь алкотестером.") { tip = null }
-        Tip.SOBER -> InfoDialog("Полная трезвость", "Средняя скорость выведения — ${BacEngine.ELIMINATION_PER_HOUR} ‰ в час. После этого момента алкоголь в крови практически отсутствует.") { tip = null }
+        Tip.PEAK -> InfoDialog("Пиковая концентрация", "Максимум ${fmtPromille(forecast.peak)} ‰ — около ${fmtDayTime(forecast.peakMs)}. Чем плотнее закуска, тем ниже и позже пик.") { tip = null }
+        Tip.DRIVE -> InfoDialog("Когда за руль", "Время, когда уровень опустится ниже лимита $limit ‰. Лимит меняется в «Настройках». Всегда проверяйтесь алкотестером.") { tip = null }
+        Tip.SOBER -> InfoDialog("Полная трезвость", "Средняя скорость выведения — ${BacEngine.ELIMINATION_PER_HOUR} ‰ в час.") { tip = null }
         null -> Unit
     }
 }
@@ -123,8 +130,9 @@ private fun Gauge(value: Float, modifier: Modifier) {
             )
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            T("сейчас в крови", 12.sp, color = c.textDim)
             T(fmtPromille(value), 56.sp, FontWeight.Black)
-            T("промилле сейчас", 12.sp, color = c.textDim)
+            T("промилле", 12.sp, color = c.textDim)
             Box(Modifier.size(6.dp))
             T(state.title, 18.sp, FontWeight.Bold, color)
             T(state.hint, 12.sp, color = c.textDim, align = TextAlign.Center)
@@ -170,25 +178,6 @@ private fun Chart(f: Forecast, nowMs: Long, limit: Float, modifier: Modifier) {
             T(fmtTime(start), 11.sp, color = c.textDim, modifier = Modifier.weight(1f))
             T("сейчас ${fmtTime(nowMs)}", 11.sp, FontWeight.SemiBold, c.accent2, Modifier.weight(1f), TextAlign.Center)
             T(fmtTime(end), 11.sp, color = c.textDim, modifier = Modifier.weight(1f), align = TextAlign.End)
-        }
-    }
-}
-
-@Composable
-fun EmptyState(emoji: String, title: String, text: String, action: String?, onAction: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().padding(32.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        T(emoji, 64.sp)
-        Box(Modifier.size(12.dp))
-        T(title, 22.sp, FontWeight.Bold, align = TextAlign.Center)
-        Box(Modifier.size(6.dp))
-        T(text, 14.sp, color = Ui.c.textDim, align = TextAlign.Center)
-        if (action != null) {
-            Box(Modifier.size(20.dp))
-            PrimaryButton(action, onAction, icon = Ic.Plus)
         }
     }
 }

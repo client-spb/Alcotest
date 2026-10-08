@@ -30,8 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -47,56 +45,31 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import kotlinx.coroutines.delay
-import kras.example.many.ads.Interstitial
 import kras.example.many.ads.StickyBanner
 import kras.example.many.core.AppStore
 import kras.example.many.core.BacEngine
 import kras.example.many.core.Forecast
-import kras.example.many.ui.tabs.DrinksTab
-import kras.example.many.ui.tabs.ForecastTab
+import kras.example.many.ui.calc.CalcScreen
+import kras.example.many.ui.calc.CalculatingOverlay
 import kras.example.many.ui.tabs.HistoryTab
-import kras.example.many.ui.tabs.ProfileTab
+import kras.example.many.ui.tabs.SettingsTab
 import kras.example.many.ui.theme.Ui
 
 const val STORE_URL = "https://www.rustore.ru/catalog/app/kras.example.many"
 
-enum class Tab(val title: String, val subtitle: String, val icon: ImageVector) {
-    BAR("Бар", "Что пьём сегодня?", Ic.Glass),
-    FORECAST("Прогноз", "Обновляется каждые 30 секунд", Ic.Pulse),
-    HISTORY("История", "Ваши прошлые сессии", Ic.History),
-    PROFILE("Профиль", "Параметры точного расчёта", Ic.User),
+enum class Tab(val title: String, val icon: ImageVector) {
+    CALC("Расчёт", Ic.Glass),
+    HISTORY("История", Ic.History),
+    SETTINGS("Настройки", Ic.Sliders),
 }
 
 @Composable
 fun AppRoot(activity: Activity) {
     val c = Ui.c
-    var tab by rememberSaveable { mutableStateOf(Tab.BAR) }
-    var tick by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(30_000)
-            tick = System.currentTimeMillis()
-        }
-    }
-    val changes = AppStore.changeCounter
-    val nowMs = remember(tick, changes) { System.currentTimeMillis() }
-    val forecast = remember(AppStore.drinks, AppStore.profile, AppStore.stomach, nowMs) {
-        BacEngine.compute(AppStore.drinks, AppStore.profile, AppStore.stomach, nowMs)
-    }
-    var adShownAt by rememberSaveable { mutableIntStateOf(-1) }
-
-    fun select(t: Tab) {
-        // Межстраничная реклама — при переходе к новому прогнозу (не чаще кулдауна).
-        if (t == Tab.FORECAST && tab != t && AppStore.drinks.isNotEmpty() && changes != adShownAt) {
-            adShownAt = changes
-            Interstitial.maybeShow(activity)
-        }
-        tab = t
-    }
+    var tab by rememberSaveable { mutableStateOf(Tab.CALC) }
 
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to c.bgGlow, 0.45f to c.bg, 1f to c.bg))) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            TopBar(tab, forecast)
             AnimatedContent(
                 targetState = tab,
                 modifier = Modifier.weight(1f),
@@ -107,17 +80,20 @@ fun AppRoot(activity: Activity) {
                 label = "tabs",
             ) { t ->
                 when (t) {
-                    Tab.BAR -> DrinksTab(forecast, nowMs) { select(Tab.FORECAST) }
-                    Tab.FORECAST -> ForecastTab(forecast, nowMs, { select(Tab.BAR) }) { shareForecast(activity, forecast) }
-                    Tab.HISTORY -> HistoryTab { select(Tab.BAR) }
-                    Tab.PROFILE -> ProfileTab(onShareApp = { shareText(activity, "Алкотестер — считает промилле и время до трезвости:\n$STORE_URL") }) {
+                    Tab.CALC -> CalcScreen(activity) { shareForecast(activity, it) }
+                    Tab.HISTORY -> HistoryTab {
+                        AppStore.newCalculation()
+                        tab = Tab.CALC
+                    }
+                    Tab.SETTINGS -> SettingsTab(onShareApp = { shareText(activity, "Алкотестер — считает промилле и время до трезвости:\n$STORE_URL") }) {
                         runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, STORE_URL.toUri())) }
                     }
                 }
             }
             StickyBanner(Modifier.padding(top = 6.dp))
-            BottomBar(tab, ::select)
+            BottomBar(tab) { tab = it }
         }
+        if (AppStore.calculating) CalculatingOverlay()
         ToastHost(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp))
     }
 
@@ -130,23 +106,6 @@ fun AppRoot(activity: Activity) {
             onConfirm = AppStore::acceptDisclaimer,
             onDismiss = {},
         )
-    }
-}
-
-@Composable
-private fun TopBar(tab: Tab, forecast: Forecast) {
-    val c = Ui.c
-    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp, top = 12.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f)) {
-            T(tab.title, 30.sp, FontWeight.Black)
-            T(tab.subtitle, 13.sp, color = c.textDim)
-        }
-        if (tab != Tab.BAR && tab != Tab.FORECAST && !forecast.isEmpty) {
-            val color = c.level(BacEngine.stateOf(forecast.current).level)
-            Box(
-                Modifier.clip(RoundedCornerShape(14.dp)).background(color.copy(alpha = 0.15f)).padding(horizontal = 12.dp, vertical = 6.dp)
-            ) { T("${fmtPromille(forecast.current)} ‰", 14.sp, FontWeight.Bold, color) }
-        }
     }
 }
 
@@ -225,7 +184,7 @@ private fun shareText(activity: Activity, text: String) {
 }
 
 private fun shareForecast(activity: Activity, f: Forecast) {
-    val drinks = AppStore.drinks.groupBy { it.type }.entries.joinToString("\n") { (type, list) ->
+    val drinks = AppStore.result.groupBy { it.type }.entries.joinToString("\n") { (type, list) ->
         "${type.emoji} ${type.title}: ${list.size} шт, ${fmtVolume(list.sumOf { it.volumeMl })}"
     }
     val text = buildString {

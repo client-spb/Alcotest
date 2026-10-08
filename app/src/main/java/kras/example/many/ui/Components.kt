@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -256,6 +257,33 @@ fun RowScope.StatTile(
     }
 }
 
+@Composable
+fun ScreenHeader(title: String, subtitle: String, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 14.dp)) {
+        T(title, 30.sp, FontWeight.Black)
+        T(subtitle, 13.sp, color = Ui.c.textDim)
+    }
+}
+
+@Composable
+fun EmptyState(emoji: String, title: String, text: String, action: String?, onAction: () -> Unit) {
+    Column(
+        Modifier.fillMaxSize().padding(32.dp),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        T(emoji, 64.sp)
+        Box(Modifier.size(12.dp))
+        T(title, 22.sp, FontWeight.Bold, align = TextAlign.Center)
+        Box(Modifier.size(6.dp))
+        T(text, 14.sp, color = Ui.c.textDim, align = TextAlign.Center)
+        if (action != null) {
+            Box(Modifier.size(20.dp))
+            PrimaryButton(action, onAction, icon = Ic.Plus)
+        }
+    }
+}
+
 // ---- Форматирование ----
 
 private val ru = Locale.forLanguageTag("ru")
@@ -277,6 +305,8 @@ fun fmtDayTime(ms: Long): String {
     }
     return prefix + dt.format(hm)
 }
+
+fun fmtMinutes(min: Int): String = String.format(ru, "%02d:%02d", min / 60, min % 60)
 
 fun fmtDate(ms: Long): String = Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault()).format(dayMonth)
 
