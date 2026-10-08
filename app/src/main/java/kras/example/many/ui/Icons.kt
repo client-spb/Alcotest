@@ -1,12 +1,15 @@
 package kras.example.many.ui
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
+import kras.example.many.R
 
 /** Собственный линейный набор иконок (24×24, штрих 2). */
 object Ic {
@@ -49,4 +52,16 @@ object Ic {
         "M1 14h6", "M9 8h6", "M17 16h6",
     )
     val Refresh = line("refresh", "M3 12a9 9 0 0 1 15.5 -6.2L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1 -15.5 6.2L3 16", "M3 21v-5h5")
+}
+
+/** Иконки Material Symbols из res/drawable. */
+object Sym {
+    val Back: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.arrow_back)
+    val Next: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.arrow_forward)
+    val Check: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.check)
+    val Chevron: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.chevron_right)
+    val Close: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.close)
+    val Refresh: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.refresh)
+    val Clock: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.schedule)
+    val Share: ImageVector @Composable get() = ImageVector.vectorResource(R.drawable.share)
 }

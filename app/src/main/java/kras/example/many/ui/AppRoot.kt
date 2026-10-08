@@ -4,17 +4,13 @@ import android.app.Activity
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -25,7 +21,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -37,8 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -58,7 +52,7 @@ import kras.example.many.ui.theme.Ui
 const val STORE_URL = "https://www.rustore.ru/catalog/app/kras.example.many"
 
 enum class Tab(val title: String, val icon: ImageVector) {
-    CALC("Расчёт", Ic.Glass),
+    CALC("Тест", Ic.Glass),
     HISTORY("История", Ic.History),
     SETTINGS("Настройки", Ic.Sliders),
 }
@@ -68,80 +62,70 @@ fun AppRoot(activity: Activity) {
     val c = Ui.c
     var tab by rememberSaveable { mutableStateOf(Tab.CALC) }
 
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to c.bgGlow, 0.45f to c.bg, 1f to c.bg))) {
+    Box(Modifier.fillMaxSize().background(c.bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
             AnimatedContent(
-                targetState = tab,
+                targetState = AppStore.onboarded,
                 modifier = Modifier.weight(1f),
-                transitionSpec = {
-                    val dir = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                    (fadeIn() + slideInHorizontally { dir * it / 5 }) togetherWith fadeOut()
-                },
-                label = "tabs",
-            ) { t ->
-                when (t) {
-                    Tab.CALC -> CalcScreen(activity) { shareForecast(activity, it) }
-                    Tab.HISTORY -> HistoryTab {
-                        AppStore.newCalculation()
-                        tab = Tab.CALC
-                    }
-                    Tab.SETTINGS -> SettingsTab(onShareApp = { shareText(activity, "Алкотестер — считает промилле и время до трезвости:\n$STORE_URL") }) {
-                        runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, STORE_URL.toUri())) }
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "onboarding",
+            ) { done ->
+                if (!done) {
+                    Onboarding()
+                } else {
+                    AnimatedContent(
+                        targetState = tab,
+                        modifier = Modifier.fillMaxSize(),
+                        transitionSpec = { fadeIn() togetherWith fadeOut() },
+                        label = "tabs",
+                    ) { t ->
+                        when (t) {
+                            Tab.CALC -> CalcScreen(activity) { shareForecast(activity, it) }
+                            Tab.HISTORY -> HistoryTab {
+                                AppStore.newCalculation()
+                                tab = Tab.CALC
+                            }
+                            Tab.SETTINGS -> SettingsTab(onShareApp = { shareText(activity, "Алкотестер — считает промилле и время до трезвости:\n$STORE_URL") }) {
+                                runCatching { activity.startActivity(Intent(Intent.ACTION_VIEW, STORE_URL.toUri())) }
+                            }
+                        }
                     }
                 }
             }
-            StickyBanner(Modifier.padding(top = 6.dp))
-            BottomBar(tab) { tab = it }
+            StickyBanner(Modifier.padding(top = 8.dp))
+            if (AppStore.onboarded) BottomBar(tab) { tab = it } else Box(Modifier.navigationBarsPadding())
         }
         if (AppStore.calculating) CalculatingOverlay()
         ToastHost(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 8.dp))
     }
 
-    if (!AppStore.disclaimerAccepted) {
+    if (AppStore.justOnboarded) {
         InfoDialog(
-            title = "Добро пожаловать 🥂",
-            text = "Приложение рассчитывает примерную концентрацию алкоголя в крови по формуле Видмарка.\n\n" +
-                "Это не медицинский прибор и не алкотестер. Не используйте результат как разрешение садиться за руль.",
-            confirm = "Принимаю",
-            onConfirm = AppStore::acceptDisclaimer,
-            onDismiss = {},
-        )
+            title = "Готово",
+            text = "Данные сохранены. Изменить их можно позже во вкладке «Настройки».\n\n" +
+                "Расчёт ориентировочный и не заменяет алкотестер. Не используйте его как разрешение садиться за руль.",
+            confirm = "Начать",
+        ) { AppStore.justOnboarded = false }
     }
 }
 
 @Composable
 private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
     val c = Ui.c
-    val shape = RoundedCornerShape(28.dp)
-    Row(
-        Modifier
-            .navigationBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .fillMaxWidth()
-            .height(68.dp)
-            .shadow(16.dp, shape, ambientColor = c.accent, spotColor = c.accent)
-            .clip(shape)
-            .background(c.surface)
-            .border(1.dp, c.text.copy(alpha = 0.06f), shape)
-            .padding(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Tab.entries.forEach { t ->
-            val active = t == selected
-            val bg by animateColorAsState(if (active) c.accent else c.surface, label = "nav")
-            val fg = if (active) c.onAccent else c.textDim
-            Column(
-                Modifier
-                    .weight(if (active) 1.6f else 1f)
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(bg)
-                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSelect(t) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            ) {
-                Icon(t.icon, t.title, tint = fg, modifier = Modifier.size(22.dp))
-                if (active) T(t.title, 11.sp, FontWeight.Bold, fg, maxLines = 1)
+    Column(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding()) {
+        HorizontalDivider(color = c.line)
+        Row(Modifier.fillMaxWidth().height(60.dp)) {
+            Tab.entries.forEach { t ->
+                val active = t == selected
+                val color = if (active) c.accent else c.textDim
+                Column(
+                    Modifier.weight(1f).height(60.dp).clickable { onSelect(t) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(t.icon, null, tint = color, modifier = Modifier.size(22.dp))
+                    T(t.title, 12.sp, if (active) FontWeight.SemiBold else FontWeight.Normal, color, modifier = Modifier.padding(top = 2.dp))
+                }
             }
         }
     }
@@ -155,23 +139,19 @@ private fun ToastHost(modifier: Modifier) {
     if (msg != null) last = msg
     LaunchedEffect(msg) {
         if (msg != null) {
-            delay(1800)
+            delay(2000)
             AppStore.toast = null
         }
     }
-    AnimatedVisibility(
-        visible = msg != null,
-        modifier = modifier,
-        enter = slideInVertically { -it } + fadeIn(),
-        exit = slideOutVertically { -it } + fadeOut(),
-    ) {
+    AnimatedVisibility(visible = msg != null, modifier = modifier, enter = fadeIn(), exit = fadeOut()) {
         Box(
             Modifier
-                .shadow(12.dp, RoundedCornerShape(20.dp))
-                .clip(RoundedCornerShape(20.dp))
-                .background(c.surfaceHigh)
-                .padding(horizontal = 18.dp, vertical = 12.dp)
-        ) { T(last, 14.sp, FontWeight.SemiBold) }
+                .padding(horizontal = 16.dp)
+                .clip(ControlShape)
+                .background(c.text)
+                .border(1.dp, c.text, ControlShape)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) { T(last, 14.sp, FontWeight.Medium, c.bg) }
     }
 }
 
@@ -185,15 +165,15 @@ private fun shareText(activity: Activity, text: String) {
 
 private fun shareForecast(activity: Activity, f: Forecast) {
     val drinks = AppStore.result.groupBy { it.type }.entries.joinToString("\n") { (type, list) ->
-        "${type.emoji} ${type.title}: ${list.size} шт, ${fmtVolume(list.sumOf { it.volumeMl })}"
+        "${type.title}: ${list.size} шт., ${fmtVolume(list.sumOf { it.volumeMl })}"
     }
     val text = buildString {
-        appendLine("🥂 Алкотестер — мой прогноз")
+        appendLine("Алкотестер — мой результат")
         appendLine()
         appendLine(drinks)
         appendLine()
         appendLine("Сейчас: ${fmtPromille(f.current)} ‰ (${BacEngine.stateOf(f.current).title})")
-        appendLine("Пик: ${fmtPromille(f.peak)} ‰ в ${fmtDayTime(f.peakMs)}")
+        appendLine("Пик: ${fmtPromille(f.peak)} ‰ около ${fmtDayTime(f.peakMs)}")
         f.driveMs?.let { appendLine("Ниже лимита: ${fmtDayTime(it)}") }
         f.soberMs?.let { appendLine("Полная трезвость: ${fmtDayTime(it)}") }
         appendLine()

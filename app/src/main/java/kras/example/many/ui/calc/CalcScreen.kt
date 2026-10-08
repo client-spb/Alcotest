@@ -31,26 +31,16 @@ import androidx.compose.ui.unit.sp
 import kras.example.many.ads.Interstitial
 import kras.example.many.core.AppStore
 import kras.example.many.core.Forecast
-import kras.example.many.ui.Ic
+import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
 import kras.example.many.ui.T
 import kras.example.many.ui.theme.Ui
-
-private data class StepInfo(val title: String, val hint: String)
-
-private val steps = listOf(
-    StepInfo("Что пили?", "Нажмите на напиток и укажите объём"),
-    StepInfo("Когда пили?", "Время и закуска влияют на результат"),
-    StepInfo("О вас", "Пол, вес и рост для точного расчёта"),
-    StepInfo("Результат", "Обновляется каждые 30 секунд"),
-)
 
 @Composable
 fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
     val step = AppStore.step
 
     Column(Modifier.fillMaxSize()) {
-        StepHeader(step)
         AnimatedContent(
             targetState = step,
             modifier = Modifier.weight(1f),
@@ -60,29 +50,35 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
             },
             label = "steps",
         ) { s ->
-            when (s) {
-                AppStore.STEP_DRINKS -> StepDrinks()
-                AppStore.STEP_TIME -> StepTime()
-                AppStore.STEP_PROFILE -> StepProfile()
-                else -> StepResult(onShare)
+            Column(Modifier.fillMaxSize()) {
+                when (s) {
+                    AppStore.STEP_START -> StartScreen()
+                    AppStore.STEP_DRINKS -> {
+                        StepHeader(1, "Что пили?", "Нажмите на напиток, укажите крепость и количество")
+                        Box(Modifier.weight(1f)) { StepDrinks() }
+                    }
+                    AppStore.STEP_TIME -> {
+                        StepHeader(2, "Когда пили?", "Время и закуска влияют на результат")
+                        Box(Modifier.weight(1f)) { StepTime() }
+                    }
+                    else -> {
+                        StepHeader(null, "Результат", "Обновляется каждые 30 секунд")
+                        Box(Modifier.weight(1f)) { StepResult(onShare) }
+                    }
+                }
             }
         }
-        if (step < AppStore.STEP_RESULT) {
+        if (step == AppStore.STEP_DRINKS || step == AppStore.STEP_TIME) {
             Row(
                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                if (step > AppStore.STEP_DRINKS) {
-                    PrimaryButton("Назад", { AppStore.step = step - 1 }, Modifier.weight(0.7f), Ic.Back, secondary = true)
-                }
-                if (step < AppStore.STEP_PROFILE) {
-                    PrimaryButton("Далее", {
-                        if (step == AppStore.STEP_DRINKS && AppStore.draft.isEmpty()) {
-                            AppStore.toast = "Сначала добавьте хотя бы один напиток"
-                        } else {
-                            AppStore.step = step + 1
-                        }
-                    }, Modifier.weight(1f), Ic.Next)
+                PrimaryButton("Назад", { AppStore.step = step - 1 }, Modifier.weight(1f), secondary = true)
+                if (step == AppStore.STEP_DRINKS) {
+                    PrimaryButton("Продолжить", {
+                        if (AppStore.draft.isEmpty()) AppStore.toast = "Сначала добавьте хотя бы один напиток"
+                        else AppStore.step = AppStore.STEP_TIME
+                    }, Modifier.weight(1f))
                 } else {
                     PrimaryButton("Рассчитать", {
                         AppStore.calculating = true
@@ -90,7 +86,7 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
                             AppStore.calculating = false
                             AppStore.calculate(System.currentTimeMillis())
                         }
-                    }, Modifier.weight(1f), Ic.Pulse)
+                    }, Modifier.weight(1f))
                 }
             }
         }
@@ -98,34 +94,59 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
 }
 
 @Composable
-private fun StepHeader(step: Int) {
+private fun StartScreen() {
     val c = Ui.c
-    val info = steps[step]
-    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 14.dp)) {
-        if (step < AppStore.STEP_RESULT) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                repeat(3) { i ->
-                    val color by animateColorAsState(if (i <= step) c.accent else c.surfaceHigh, label = "progress")
-                    Box(Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)).background(color))
-                }
-                T("  ${step + 1} из 3", 12.sp, FontWeight.Bold, c.textDim)
-            }
-            Box(Modifier.size(10.dp))
+    val p = AppStore.profile
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center) {
+        T("Алкотестер", 32.sp, FontWeight.SemiBold)
+        T(
+            "Узнайте, сколько промилле в крови сейчас, когда можно за руль и когда алкоголь полностью выведется.",
+            15.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+        )
+        Panel(Modifier.fillMaxWidth()) {
+            T("Ваши данные", 13.sp, color = c.textDim)
+            T(
+                "${if (p.male) "Мужчина" else "Женщина"}, ${p.age} лет, ${p.weightKg} кг, ${p.heightCm} см",
+                15.sp, FontWeight.Medium, modifier = Modifier.padding(top = 2.dp),
+            )
+            T("Изменить можно в настройках", 12.sp, color = c.textDim, modifier = Modifier.padding(top = 2.dp))
         }
-        T(info.title, 30.sp, FontWeight.Black)
-        T(info.hint, 13.sp, color = c.textDim)
+        Box(Modifier.size(24.dp))
+        PrimaryButton("Начать тест", AppStore::newCalculation, Modifier.fillMaxWidth())
+        if (AppStore.result.isNotEmpty()) {
+            Box(Modifier.size(10.dp))
+            PrimaryButton("Последний результат", { AppStore.step = AppStore.STEP_RESULT }, Modifier.fillMaxWidth(), secondary = true)
+        }
     }
 }
 
-/** Затемнение «Считаем…» на время загрузки/показа рекламы. */
+@Composable
+private fun StepHeader(number: Int?, title: String, hint: String) {
+    val c = Ui.c
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)) {
+        if (number != null) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                repeat(2) { i ->
+                    val color by animateColorAsState(if (i < number) c.accent else c.line, label = "progress")
+                    Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(color))
+                }
+            }
+            T("Шаг $number из 2", 12.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+        }
+        T(title, 24.sp, FontWeight.SemiBold)
+        T(hint, 13.sp, color = c.textDim)
+    }
+}
+
+/** Затемнение «Считаем…» на время загрузки и показа рекламы. */
 @Composable
 fun CalculatingOverlay() {
     val c = Ui.c
-    Box(Modifier.fillMaxSize().background(c.bg.copy(alpha = 0.92f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(c.bg), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(color = c.accent, strokeWidth = 5.dp, modifier = Modifier.size(56.dp))
+            CircularProgressIndicator(color = c.accent, strokeWidth = 3.dp, modifier = Modifier.size(40.dp))
             Box(Modifier.size(16.dp))
-            T("Считаем…", 20.sp, FontWeight.Bold)
+            T("Считаем…", 16.sp, FontWeight.Medium)
         }
     }
 }

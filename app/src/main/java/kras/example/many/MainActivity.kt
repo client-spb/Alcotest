@@ -11,6 +11,7 @@ import kras.example.many.ads.Interstitial
 import kras.example.many.core.AppStore
 import kras.example.many.ui.AppRoot
 import kras.example.many.ui.theme.AppTheme
+import kras.example.many.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
 
@@ -22,14 +23,14 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            val theme = AppStore.theme
-            LaunchedEffect(theme) {
+            val dark = AppStore.theme.isDark()
+            LaunchedEffect(dark) {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
-                    isAppearanceLightStatusBars = !theme.palette.isDark
-                    isAppearanceLightNavigationBars = !theme.palette.isDark
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
                 }
             }
-            AppTheme(theme) { AppRoot(this) }
+            AppTheme(dark) { AppRoot(this) }
         }
     }
 }

@@ -2,7 +2,6 @@ package kras.example.many.core
 
 enum class DrinkType(
     val title: String,
-    val emoji: String,
     val presetsMl: List<Int>,
     val defaultMl: Int,
     val stepMl: Int,
@@ -10,12 +9,12 @@ enum class DrinkType(
     val minAbv: Float,
     val maxAbv: Float,
 ) {
-    BEER("Пиво", "🍺", listOf(330, 500, 1000), 500, 50, 5f, 0.5f, 14f),
-    WINE("Вино", "🍷", listOf(100, 150, 250, 750), 150, 25, 12f, 8f, 18f),
-    SPARKLING("Игристое", "🥂", listOf(100, 150, 750), 150, 25, 11f, 6f, 14f),
-    SPIRITS("Крепкое", "🥃", listOf(30, 50, 100, 250), 50, 10, 40f, 25f, 70f),
-    COCKTAIL("Коктейль", "🍹", listOf(200, 250, 330), 250, 25, 8f, 3f, 30f),
-    CIDER("Сидр", "🍏", listOf(330, 500, 1000), 500, 50, 5f, 1f, 10f),
+    BEER("Пиво", listOf(330, 500, 1000), 500, 50, 5f, 0.5f, 14f),
+    WINE("Вино", listOf(100, 150, 250, 750), 150, 25, 12f, 8f, 18f),
+    SPARKLING("Игристое", listOf(100, 150, 750), 150, 25, 11f, 6f, 14f),
+    SPIRITS("Крепкое", listOf(30, 50, 100, 250), 50, 10, 40f, 25f, 70f),
+    COCKTAIL("Коктейль", listOf(200, 250, 330), 250, 25, 8f, 3f, 30f),
+    CIDER("Сидр", listOf(330, 500, 1000), 500, 50, 5f, 1f, 10f),
 }
 
 data class DrinkEntry(
@@ -33,10 +32,10 @@ data class DrinkEntry(
     }
 }
 
-enum class Stomach(val title: String, val emoji: String, val absorptionMin: Int, val deficit: Float) {
-    EMPTY("Натощак", "🫙", 30, 0.10f),
-    SNACK("Перекус", "🥨", 60, 0.15f),
-    FULL("Плотно", "🍖", 90, 0.25f),
+enum class Stomach(val title: String, val absorptionMin: Int, val deficit: Float) {
+    EMPTY("Натощак", 30, 0.10f),
+    SNACK("Перекус", 60, 0.15f),
+    FULL("Плотно", 90, 0.25f),
 }
 
 data class Profile(
@@ -54,5 +53,6 @@ data class SessionRecord(
     val totalMl: Int,
     val grams: Float,
     val peak: Float,
-    val emojis: String,
+    /** Названия выпитых напитков через запятую. */
+    val kinds: String,
 )

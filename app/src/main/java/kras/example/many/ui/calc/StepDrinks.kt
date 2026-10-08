@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -31,30 +30,30 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kras.example.many.core.AppStore
-import kras.example.many.core.DrinkEntry
 import kras.example.many.core.DrinkType
-import kras.example.many.ui.Ic
+import kras.example.many.ui.ControlShape
+import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
-import kras.example.many.ui.PillGroup
 import kras.example.many.ui.PrimaryButton
-import kras.example.many.ui.RoundIconButton
 import kras.example.many.ui.SectionLabel
+import kras.example.many.ui.Segmented
 import kras.example.many.ui.Sheet
 import kras.example.many.ui.Stepper
+import kras.example.many.ui.Sym
 import kras.example.many.ui.T
+import kras.example.many.ui.abvText
 import kras.example.many.ui.fmtVolume
 import kras.example.many.ui.theme.Ui
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
 fun StepDrinks() {
     val c = Ui.c
     var addType by remember { mutableStateOf<DrinkType?>(null) }
+    var askMore by remember { mutableStateOf(false) }
     val draft = AppStore.draft
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -70,21 +69,21 @@ fun StepDrinks() {
                 }
             }
         }
-        Box(Modifier.size(14.dp))
-        SectionLabel(if (draft.isEmpty()) "Добавлено" else "Добавлено · ${draft.sumOf { it.count }} шт")
-        Box(Modifier.fillMaxWidth().height(48.dp), contentAlignment = Alignment.CenterStart) {
+        Box(Modifier.size(12.dp))
+        SectionLabel(if (draft.isEmpty()) "Вы выпили" else "Вы выпили · нажмите, чтобы убрать")
+        Box(Modifier.fillMaxWidth().height(40.dp), contentAlignment = Alignment.CenterStart) {
             if (draft.isEmpty()) {
-                T("Нажмите на напиток, чтобы добавить его", 13.sp, color = c.textDim)
+                T("Пока ничего — выберите напиток выше", 14.sp, color = c.textDim)
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(draft, key = { it.id }) { d ->
                         Row(
-                            Modifier.height(44.dp).clip(RoundedCornerShape(14.dp)).background(c.surfaceHigh)
+                            Modifier.height(40.dp).clip(ControlShape).background(c.surfaceHigh)
                                 .clickable { AppStore.removeDraft(d.id) }.padding(start = 12.dp, end = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            T("${d.type.emoji} ${if (d.count > 1) "${d.count}×" else ""}${fmtVolume(d.volumeMl)}", 13.sp, FontWeight.SemiBold)
-                            Icon(Ic.Close, "Удалить", tint = c.textDim, modifier = Modifier.padding(start = 6.dp).size(16.dp))
+                            T("${d.type.title} ${d.count} × ${fmtVolume(d.volumeMl)}", 13.sp, FontWeight.Medium)
+                            Icon(Sym.Close, "Убрать", tint = c.textDim, modifier = Modifier.padding(start = 4.dp).size(16.dp))
                         }
                     }
                 }
@@ -92,79 +91,82 @@ fun StepDrinks() {
         }
     }
 
-    addType?.let { type -> AddDrinkSheet(type) { addType = null } }
+    addType?.let { type ->
+        AddDrinkSheet(type, onDismiss = { addType = null }) { askMore = true }
+    }
+    if (askMore) {
+        InfoDialog(
+            title = "Напиток добавлен",
+            text = "Пили что-то ещё?",
+            confirm = "Продолжить",
+            onConfirm = { AppStore.step = AppStore.STEP_TIME },
+            dismissText = "Добавить ещё",
+            onDismiss = { askMore = false },
+        )
+    }
 }
 
 @Composable
 private fun DrinkTile(type: DrinkType, count: Int, modifier: Modifier, onClick: () -> Unit) {
     val c = Ui.c
     val (ml, abv) = AppStore.lastFor(type)
-    Box(modifier) {
-        Panel(
-            Modifier.fillMaxSize(), onClick = onClick, padding = PaddingValues(12.dp),
-            color = if (count > 0) c.accent.copy(alpha = 0.14f) else c.surface,
-        ) {
-            Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                T(type.emoji, 36.sp)
-                T(type.title, 16.sp, FontWeight.Bold, maxLines = 1)
-                T("${fmtVolume(ml)} · ${abvText(abv)}", 12.sp, color = c.textDim, maxLines = 1)
+    Panel(
+        modifier, onClick = onClick, padding = PaddingValues(14.dp),
+        color = if (count > 0) c.accent.copy(alpha = 0.08f) else c.surface,
+        borderColor = if (count > 0) c.accent else c.line,
+    ) {
+        Row(verticalAlignment = Alignment.Top) {
+            T(type.title, 17.sp, FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1)
+            if (count > 0) {
+                Box(
+                    Modifier.clip(RoundedCornerShape(6.dp)).background(c.accent).padding(horizontal = 7.dp, vertical = 2.dp)
+                ) { T("$count", 12.sp, FontWeight.Bold, c.onAccent) }
             }
         }
-        Box(
-            Modifier.align(Alignment.TopEnd).padding(8.dp).size(26.dp).clip(CircleShape)
-                .background(if (count > 0) c.accent else c.surfaceHigh),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (count > 0) T("$count", 12.sp, FontWeight.Black, c.onAccent)
-            else Icon(Ic.Plus, null, tint = c.textDim, modifier = Modifier.size(14.dp))
-        }
+        Box(Modifier.weight(1f))
+        T("${fmtVolume(ml)}, ${abvText(abv)}", 13.sp, color = c.textDim, maxLines = 1)
     }
 }
 
-fun abvText(abv: Float) = String.format(Locale.forLanguageTag("ru"), "%.1f%%", abv).replace(",0%", "%")
-
 @Composable
-private fun AddDrinkSheet(type: DrinkType, onDismiss: () -> Unit) {
+private fun AddDrinkSheet(type: DrinkType, onDismiss: () -> Unit, onAdded: () -> Unit) {
     val c = Ui.c
     val last = AppStore.lastFor(type)
     var ml by remember { mutableIntStateOf(last.first) }
     var abv by remember { mutableFloatStateOf(last.second) }
     var count by remember { mutableIntStateOf(1) }
-    val gramsOne = DrinkEntry(0, type, ml, abv, 0).grams
 
-    Sheet(onDismiss, "${type.emoji}  ${type.title}") {
-        SectionLabel("1. Объём одной порции")
-        PillGroup(type.presetsMl, ml, { fmtVolume(it) }, { ml = it }, Modifier.fillMaxWidth())
-        Box(Modifier.size(12.dp))
-        Stepper(
-            value = fmtVolume(ml),
-            caption = "${gramsOne.roundToInt()} г чистого спирта",
-            onMinus = { ml = (ml - type.stepMl).coerceAtLeast(type.stepMl) },
-            onPlus = { ml = (ml + type.stepMl).coerceAtMost(3000) },
-        )
-        Box(Modifier.size(18.dp))
-        SectionLabel("2. Крепость · ${abvText(abv)}")
+    Sheet(onDismiss, type.title) {
+        SectionLabel("Объём одной порции")
+        Segmented(type.presetsMl, ml, { fmtVolume(it) }, { ml = it }, Modifier.fillMaxWidth())
+        Box(Modifier.size(20.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            SectionLabel("Крепость", Modifier.weight(1f))
+            T(abvText(abv), 15.sp, FontWeight.SemiBold, modifier = Modifier.padding(bottom = 8.dp))
+        }
         Slider(
             value = abv,
             onValueChange = { abv = (it * 2).roundToInt() / 2f },
             valueRange = type.minAbv..type.maxAbv,
             colors = SliderDefaults.colors(thumbColor = c.accent, activeTrackColor = c.accent, inactiveTrackColor = c.surfaceHigh),
         )
-        Box(Modifier.size(12.dp))
-        SectionLabel("3. Сколько порций")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            RoundIconButton(Ic.Minus, { count = (count - 1).coerceAtLeast(1) }, size = 52.dp)
-            T("$count", 34.sp, FontWeight.Black, modifier = Modifier.weight(1f), align = TextAlign.Center)
-            RoundIconButton(Ic.Plus, { count = (count + 1).coerceAtMost(20) }, size = 52.dp, bg = c.accent, tint = c.onAccent)
-        }
-        Box(Modifier.size(20.dp))
+        Box(Modifier.size(16.dp))
+        SectionLabel("Количество порций")
+        Stepper(
+            "$count",
+            caption = "всего ${fmtVolume(ml * count)}",
+            onMinus = { count = (count - 1).coerceAtLeast(1) },
+            onPlus = { count = (count + 1).coerceAtMost(20) },
+        )
+        Box(Modifier.size(24.dp))
         PrimaryButton(
-            "Добавить напиток",
+            "Добавить",
             {
                 AppStore.addDraft(type, ml, abv, count)
                 onDismiss()
+                onAdded()
             },
-            Modifier.fillMaxWidth(), Ic.Plus,
+            Modifier.fillMaxWidth(),
         )
     }
 }

@@ -21,9 +21,9 @@ data class DraftDrink(val id: Long, val type: DrinkType, val volumeMl: Int, val 
 object AppStore {
     private const val PREFS = "alcotest_v2"
     private const val MAX_HISTORY = 30
-    const val STEP_DRINKS = 0
-    const val STEP_TIME = 1
-    const val STEP_PROFILE = 2
+    const val STEP_START = 0
+    const val STEP_DRINKS = 1
+    const val STEP_TIME = 2
     const val STEP_RESULT = 3
     private lateinit var prefs: SharedPreferences
 
@@ -33,13 +33,17 @@ object AppStore {
         private set
     var history by mutableStateOf<List<SessionRecord>>(emptyList())
         private set
-    var theme by mutableStateOf(ThemeId.GRAPHITE)
+    var theme by mutableStateOf(ThemeId.SYSTEM)
         private set
-    var disclaimerAccepted by mutableStateOf(false)
+    /** Только что прошли анкету — показать подсказку про настройки. */
+    var justOnboarded by mutableStateOf(false)
+
+    /** Анкета первого запуска пройдена. */
+    var onboarded by mutableStateOf(false)
         private set
 
     // ---- Мастер расчёта ----
-    var step by mutableIntStateOf(STEP_DRINKS)
+    var step by mutableIntStateOf(STEP_START)
     var draft by mutableStateOf<List<DraftDrink>>(emptyList())
         private set
     /** Начало и конец застолья, минуты от полуночи. */
@@ -64,13 +68,12 @@ object AppStore {
         resetTimes()
         runCatching { load() }
         if (!prefs.contains("profile")) runCatching { migrateLegacy(context) }
-        step = if (result.isNotEmpty()) STEP_RESULT else STEP_DRINKS
     }
 
     fun updateProfile(p: Profile) { profile = p; save() }
     fun updateStomach(s: Stomach) { stomach = s; save() }
     fun updateTheme(t: ThemeId) { theme = t; save() }
-    fun acceptDisclaimer() { disclaimerAccepted = true; save() }
+    fun finishOnboarding(p: Profile) { profile = p; onboarded = true; justOnboarded = true; save() }
     fun updateStart(min: Int) { startMin = norm(min) }
     fun updateEnd(min: Int) { endMin = norm(min) }
 
@@ -79,7 +82,6 @@ object AppStore {
     fun addDraft(type: DrinkType, volumeMl: Int, abv: Float, count: Int) {
         draft = draft + DraftDrink(System.nanoTime(), type, volumeMl, abv, count)
         lastUsed[type] = volumeMl to abv
-        toast = "${type.emoji} ${if (count > 1) "$count × " else ""}${type.title} добавлено"
         save()
     }
 
@@ -111,7 +113,7 @@ object AppStore {
                 totalMl = result.sumOf { it.volumeMl },
                 grams = result.sumOf { it.grams.toDouble() }.toFloat(),
                 peak = f.peak,
-                emojis = result.map { it.type.emoji }.distinct().joinToString(""),
+                kinds = result.map { it.type.title }.distinct().joinToString(", "),
             )
             history = (listOf(record) + history).take(MAX_HISTORY)
         }
@@ -122,10 +124,8 @@ object AppStore {
     /** Начать новый расчёт с чистого листа. */
     fun newCalculation() {
         draft = emptyList()
-        result = emptyList()
         resetTimes()
         step = STEP_DRINKS
-        save()
     }
 
     fun clearHistory() { history = emptyList(); save() }
@@ -158,7 +158,7 @@ object AppStore {
                 history.forEach { h ->
                     put(JSONObject().apply {
                         put("s", h.startMs); put("e", h.endMs); put("n", h.drinks); put("ml", h.totalMl)
-                        put("g", h.grams.toDouble()); put("p", h.peak.toDouble()); put("em", h.emojis)
+                        put("g", h.grams.toDouble()); put("p", h.peak.toDouble()); put("em", h.kinds)
                     })
                 }
             }.toString())
@@ -167,7 +167,7 @@ object AppStore {
             }.toString())
             putString("stomach", stomach.name)
             putString("theme", theme.name)
-            putBoolean("disclaimer", disclaimerAccepted)
+            putBoolean("onboarded", onboarded)
         }
     }
 
@@ -211,8 +211,8 @@ object AppStore {
             }
         }
         stomach = Stomach.entries.firstOrNull { it.name == prefs.getString("stomach", null) } ?: Stomach.SNACK
-        theme = ThemeId.entries.firstOrNull { it.name == prefs.getString("theme", null) } ?: ThemeId.GRAPHITE
-        disclaimerAccepted = prefs.getBoolean("disclaimer", false)
+        theme = ThemeId.entries.firstOrNull { it.name == prefs.getString("theme", null) } ?: ThemeId.SYSTEM
+        onboarded = prefs.getBoolean("onboarded", false)
     }
 
     /** Подхватывает вес/возраст/пол из предыдущей версии приложения. */

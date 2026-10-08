@@ -1,7 +1,6 @@
 package kras.example.many.ui.tabs
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +9,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,8 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.font.FontWeight
@@ -36,14 +34,14 @@ import kras.example.many.core.AppStore
 import kras.example.many.core.BacEngine
 import kras.example.many.core.SessionRecord
 import kras.example.many.ui.EmptyState
-import kras.example.many.ui.Ic
-import kras.example.many.ui.ScreenHeader
 import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
+import kras.example.many.ui.ScreenHeader
 import kras.example.many.ui.SectionLabel
 import kras.example.many.ui.Sheet
 import kras.example.many.ui.StatTile
+import kras.example.many.ui.Sym
 import kras.example.many.ui.T
 import kras.example.many.ui.fmtDate
 import kras.example.many.ui.fmtDayTime
@@ -55,72 +53,67 @@ import kotlin.math.roundToInt
 private const val VISIBLE_ROWS = 3
 
 @Composable
-fun HistoryTab(onAddDrink: () -> Unit) {
+fun HistoryTab(onNewTest: () -> Unit) {
     val history = AppStore.history
-    if (history.isEmpty()) {
-        Column(Modifier.fillMaxSize()) {
-            ScreenHeader("История", "Ваши прошлые расчёты")
-            EmptyState("🗂️", "История пуста", "Каждый расчёт автоматически сохраняется здесь со статистикой.", "Новый расчёт", onAddDrink)
-        }
-        return
-    }
     val c = Ui.c
     var detail by remember { mutableStateOf<SessionRecord?>(null) }
     var showAll by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
-    var tip by remember { mutableStateOf<String?>(null) }
 
     Column(Modifier.fillMaxSize()) {
-    ScreenHeader("История", "Ваши прошлые расчёты")
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(Ic.History, "Расчётов", "${history.size}", "всего", c.accent) { tip = "Сохраняются последние 30 расчётов." }
-            val avg = history.map { it.peak }.average().toFloat()
-            StatTile(Ic.Pulse, "Средний пик", "${fmtPromille(avg)} ‰", BacEngine.stateOf(avg).title, c.level(BacEngine.stateOf(avg).level)) {
-                tip = "Средняя пиковая концентрация по всем сохранённым расчётам."
-            }
-            val max = history.maxOf { it.peak }
-            StatTile(Ic.Peak, "Рекорд", "${fmtPromille(max)} ‰", fmtDate(history.first { it.peak == max }.startMs), c.accent2) {
-                tip = "Самая высокая пиковая концентрация. Береги себя 🙏"
-            }
-        }
-        Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
-            T("Пики последних расчётов", 15.sp, FontWeight.Bold)
-            Bars(history.take(8).reversed(), Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp)) { detail = it }
-        }
-        Column {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                SectionLabel("Недавние", Modifier.weight(1f))
-                if (history.size > VISIBLE_ROWS) {
-                    T("Все (${history.size}) ›", 12.sp, FontWeight.Bold, c.accent, Modifier.padding(bottom = 8.dp).clickable { showAll = true })
+        ScreenHeader("История", "Все ваши расчёты")
+        if (history.isEmpty()) {
+            EmptyState("Пока пусто", "Каждый расчёт автоматически сохраняется здесь.", "Начать тест", onNewTest)
+        } else {
+            Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    StatTile("Расчётов", "${history.size}", "всего") {}
+                    val avg = history.map { it.peak }.average().toFloat()
+                    StatTile("Средний пик", "${fmtPromille(avg)} ‰", BacEngine.stateOf(avg).title) {}
+                    val max = history.maxOf { it.peak }
+                    StatTile("Максимум", "${fmtPromille(max)} ‰", fmtDate(history.first { it.peak == max }.startMs)) {}
                 }
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                history.take(VISIBLE_ROWS).forEach { HistoryRow(it) { detail = it } }
+                Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
+                    T("Пиковые значения", 14.sp, FontWeight.Medium)
+                    Bars(history.take(8).reversed(), Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp)) { detail = it }
+                }
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        SectionLabel("Последние", Modifier.weight(1f))
+                        T("Все (${history.size})", 13.sp, FontWeight.Medium, c.accent, Modifier.padding(bottom = 8.dp).clickable { showAll = true })
+                    }
+                    Panel(Modifier.fillMaxWidth(), padding = PaddingValues(0.dp)) {
+                        history.take(VISIBLE_ROWS).forEachIndexed { i, r ->
+                            if (i > 0) HorizontalDivider(color = c.line)
+                            HistoryRow(r) { detail = r }
+                        }
+                    }
+                }
+                Box(Modifier.size(2.dp))
             }
         }
-        Box(Modifier.size(4.dp))
-    }
     }
 
     detail?.let { DetailSheet(it) { detail = null } }
     if (showAll) {
         Sheet({ showAll = false }, "Все расчёты") {
-            LazyColumn(Modifier.heightIn(max = 420.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(history) { r -> HistoryRow(r) { showAll = false; detail = r } }
+            LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                itemsIndexed(history) { i, r ->
+                    if (i > 0) HorizontalDivider(color = c.line)
+                    HistoryRow(r) { showAll = false; detail = r }
+                }
             }
-            Box(Modifier.size(12.dp))
-            PrimaryButton("Очистить историю", { confirmClear = true }, Modifier.fillMaxWidth(), Ic.Trash, danger = true)
+            Box(Modifier.size(16.dp))
+            PrimaryButton("Очистить историю", { confirmClear = true }, Modifier.fillMaxWidth(), danger = true)
         }
     }
     if (confirmClear) {
         InfoDialog(
-            "Очистить историю?", "Все сохранённые расчёты будут удалены без возможности восстановления.",
-            onDismiss = { confirmClear = false }, confirm = "Удалить", dismissText = "Отмена",
+            "Очистить историю?", "Все сохранённые расчёты будут удалены.",
+            confirm = "Удалить", dismissText = "Отмена",
             onConfirm = { AppStore.clearHistory(); showAll = false },
-        )
+        ) { confirmClear = false }
     }
-    tip?.let { InfoDialog("Статистика", it) { tip = null } }
 }
 
 @Composable
@@ -130,14 +123,12 @@ private fun Bars(items: List<SessionRecord>, modifier: Modifier, onClick: (Sessi
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items.forEach { r ->
             Column(Modifier.weight(1f).clickable { onClick(r) }, horizontalAlignment = Alignment.CenterHorizontally) {
-                T(fmtPromille(r.peak), 10.sp, FontWeight.Bold, maxLines = 1)
+                T(fmtPromille(r.peak), 10.sp, FontWeight.Medium, maxLines = 1)
                 val color = c.level(BacEngine.stateOf(r.peak).level)
                 Canvas(Modifier.fillMaxWidth().weight(1f).padding(vertical = 4.dp)) {
                     val h = (r.peak / max).coerceIn(0.03f, 1f) * size.height
-                    val w = size.width.coerceAtMost(28.dp.toPx())
-                    drawRoundRect(
-                        color, Offset((size.width - w) / 2, size.height - h), Size(w, h), CornerRadius(8.dp.toPx()),
-                    )
+                    val w = size.width.coerceAtMost(20.dp.toPx())
+                    drawRect(color, Offset((size.width - w) / 2, size.height - h), Size(w, h))
                 }
                 T(fmtDate(r.startMs).take(6), 9.sp, color = c.textDim, maxLines = 1, align = TextAlign.Center)
             }
@@ -149,17 +140,15 @@ private fun Bars(items: List<SessionRecord>, modifier: Modifier, onClick: (Sessi
 private fun HistoryRow(r: SessionRecord, onClick: () -> Unit) {
     val c = Ui.c
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(c.surface).clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().height(56.dp).clickable(onClick = onClick).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        T(r.emojis.ifEmpty { "🍸" }, 20.sp, maxLines = 1)
-        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
-            T(fmtDayTime(r.startMs), 14.sp, FontWeight.SemiBold, maxLines = 1)
-            T("${r.drinks} шт · ${fmtVolume(r.totalMl)}", 12.sp, color = c.textDim, maxLines = 1)
+        Column(Modifier.weight(1f)) {
+            T(fmtDayTime(r.startMs), 14.sp, FontWeight.Medium, maxLines = 1)
+            T("${r.kinds} · ${fmtVolume(r.totalMl)}", 12.sp, color = c.textDim, maxLines = 1)
         }
-        T("${fmtPromille(r.peak)} ‰", 15.sp, FontWeight.Bold, c.level(BacEngine.stateOf(r.peak).level))
-        Icon(Ic.Chevron, null, tint = c.textDim, modifier = Modifier.padding(start = 6.dp).size(16.dp))
+        T("${fmtPromille(r.peak)} ‰", 15.sp, FontWeight.SemiBold, c.level(BacEngine.stateOf(r.peak).level))
+        Icon(Sym.Chevron, null, tint = c.textDim, modifier = Modifier.padding(start = 4.dp).size(20.dp))
     }
 }
 
@@ -167,15 +156,14 @@ private fun HistoryRow(r: SessionRecord, onClick: () -> Unit) {
 private fun DetailSheet(r: SessionRecord, onDismiss: () -> Unit) {
     val c = Ui.c
     val state = BacEngine.stateOf(r.peak)
-    Sheet(onDismiss, "${r.emojis}  ${fmtDate(r.startMs)}") {
+    Sheet(onDismiss, "Расчёт ${fmtDate(r.startMs)}") {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile(Ic.Peak, "Пик", "${fmtPromille(r.peak)} ‰", state.title, c.level(state.level)) {}
-            StatTile(Ic.Glass, "Напитков", "${r.drinks}", fmtVolume(r.totalMl), c.accent) {}
-            StatTile(Ic.Pulse, "Спирта", "${r.grams.roundToInt()} г", "чистого", c.accent2) {}
+            StatTile("Пик", "${fmtPromille(r.peak)} ‰", state.title, c.level(state.level)) {}
+            StatTile("Порций", "${r.drinks}", fmtVolume(r.totalMl)) {}
+            StatTile("Спирта", "${r.grams.roundToInt()} г", "чистого") {}
         }
         Box(Modifier.size(14.dp))
-        T("Первый напиток: ${fmtDayTime(r.startMs)}\nПоследний: ${fmtDayTime(r.endMs)}", 14.sp, color = c.textDim)
-        Box(Modifier.size(8.dp))
-        T(state.hint, 14.sp, color = c.textDim)
+        T("Напитки: ${r.kinds}", 14.sp)
+        T("Начали: ${fmtDayTime(r.startMs)}, закончили: ${fmtDayTime(r.endMs)}", 14.sp, color = c.textDim, modifier = Modifier.padding(top = 4.dp))
     }
 }
