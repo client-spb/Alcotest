@@ -62,7 +62,8 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
                         Box(Modifier.weight(1f)) { StepTime() }
                     }
                     else -> {
-                        StepHeader(null, "Результат расчёта", "Текущая оценка и почасовой прогноз")
+                        T("Результат расчёта", 20.sp, FontWeight.SemiBold,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
                         Box(Modifier.weight(1f)) { StepResult(onShare) }
                     }
                 }

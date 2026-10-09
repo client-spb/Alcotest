@@ -1,7 +1,7 @@
 package kras.example.many.ui.calc
 
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -11,16 +11,14 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,7 +43,6 @@ import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.ControlShape
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
-import kras.example.many.ui.StatTile
 import kras.example.many.ui.T
 import kras.example.many.ui.fmtDayTime
 import kras.example.many.ui.fmtDuration
@@ -72,37 +70,40 @@ fun StepResult(onShare: (Forecast) -> Unit) {
     val state = BacEngine.stateOf(forecast.current)
     val stateColor = c.level(state.level)
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Panel(Modifier.fillMaxWidth()) {
-            T("КОНЦЕНТРАЦИЯ · ${fmtTime(nowMs)}", 12.sp, FontWeight.Medium, c.textDim)
-            Row(verticalAlignment = Alignment.Bottom) {
-                T(fmtPromille(forecast.current), 36.sp, FontWeight.SemiBold)
-                T(" ‰", 18.sp, color = c.textDim, modifier = Modifier.padding(bottom = 8.dp))
+    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Panel(Modifier.fillMaxWidth(), padding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column {
+                    T("Сейчас · ${fmtTime(nowMs)}", 11.sp, color = c.textDim)
+                    T("${fmtPromille(forecast.current)} ‰", 26.sp, FontWeight.SemiBold)
+                }
+                Column(Modifier.weight(1f)) {
+                    T(state.title, 13.sp, FontWeight.Medium, stateColor, maxLines = 1)
+                    T(state.hint, 11.sp, color = c.textDim, maxLines = 2)
+                }
             }
-            LevelBar(forecast.current)
-            T("${state.title}. ${state.hint}", 13.sp, FontWeight.Medium, stateColor, modifier = Modifier.padding(top = 8.dp))
+            HorizontalDivider(Modifier.padding(top = 4.dp), color = c.line)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ResultMetric("Пик", "${fmtPromille(forecast.peak)} ‰", "около ${fmtTime(forecast.peakMs)}") { tip = Tip.PEAK }
+                val drive = forecast.driveMs
+                val canDrive = drive == null || drive <= nowMs
+                ResultMetric(
+                    "За руль",
+                    if (canDrive) "Можно*" else fmtTime(drive!!),
+                    if (canDrive) "ниже $limit ‰" else "через ${fmtDuration(drive!! - nowMs)}",
+                    if (canDrive) c.good else c.warn,
+                ) { tip = Tip.DRIVE }
+                val sober = forecast.soberMs
+                ResultMetric(
+                    "Трезвость",
+                    if (sober == null) "—" else if (sober <= nowMs) "Уже" else fmtTime(sober),
+                    if (sober == null || sober <= nowMs) "0,00 ‰" else "через ${fmtDuration(sober - nowMs)}",
+                ) { tip = Tip.SOBER }
+            }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            StatTile("Пик", "${fmtPromille(forecast.peak)} ‰", "около ${fmtTime(forecast.peakMs)}") { tip = Tip.PEAK }
-            val drive = forecast.driveMs
-            val canDrive = drive == null || drive <= nowMs
-            StatTile(
-                "За руль",
-                if (canDrive) "Можно*" else fmtTime(drive!!),
-                if (canDrive) "ниже $limit ‰" else "через ${fmtDuration(drive!! - nowMs)}",
-                if (canDrive) c.good else c.warn,
-            ) { tip = Tip.DRIVE }
-            val sober = forecast.soberMs
-            StatTile(
-                "Трезвость",
-                if (sober == null) "—" else if (sober <= nowMs) "Уже" else fmtTime(sober),
-                if (sober == null || sober <= nowMs) "0,00 ‰" else "через ${fmtDuration(sober - nowMs)}",
-            ) { tip = Tip.SOBER }
-        }
-        Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
+        Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(10.dp)) {
             T("Почасовой прогноз", 14.sp, FontWeight.SemiBold)
-            T("От текущего времени до полного выведения", 12.sp, color = c.textDim)
-            HourlyList(forecast, nowMs, Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp))
+            HourlyList(forecast, nowMs, Modifier.fillMaxWidth().weight(1f).padding(top = 6.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PrimaryButton("Поделиться", { onShare(forecast) }, Modifier.weight(1f), secondary = true)
@@ -119,19 +120,18 @@ fun StepResult(onShare: (Forecast) -> Unit) {
     }
 }
 
-/** Горизонтальная шкала 0–3 ‰ с отметками уровней. */
 @Composable
-private fun LevelBar(value: Float) {
-    val c = Ui.c
-    val fraction by animateFloatAsState((value / 3f).coerceIn(0f, 1f), label = "level")
-    val color = c.level(BacEngine.stateOf(value).level)
-    Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)).background(c.surfaceHigh)) {
-        Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(color))
-    }
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp)) {
-        listOf("0", "1", "2", "3 ‰").forEachIndexed { i, s ->
-            T(s, 11.sp, color = c.textDim, modifier = Modifier.weight(1f), align = if (i == 3) TextAlign.End else TextAlign.Start)
-        }
+private fun RowScope.ResultMetric(
+    label: String,
+    value: String,
+    sub: String,
+    valueColor: Color = Ui.c.text,
+    onClick: () -> Unit,
+) {
+    Column(Modifier.weight(1f).clip(ControlShape).clickable(onClick = onClick).padding(vertical = 6.dp)) {
+        T(label, 11.sp, color = Ui.c.textDim, maxLines = 1)
+        T(value, 15.sp, FontWeight.SemiBold, valueColor, maxLines = 1)
+        T(sub, 10.sp, color = Ui.c.textDim, maxLines = 1)
     }
 }
 
