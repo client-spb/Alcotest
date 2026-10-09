@@ -4,13 +4,25 @@ import android.app.Activity
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.viewinterop.AndroidView
 import com.yandex.mobile.ads.banner.BannerAdEventListener
 import com.yandex.mobile.ads.banner.BannerAdSize
@@ -107,23 +119,43 @@ object Interstitial {
     }
 }
 
-/** Липкий адаптивный баннер на всю ширину экрана. */
+/** Размер слота известен до загрузки: появление рекламы не меняет высоту экрана. */
 @Composable
 fun StickyBanner(modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val widthDp = LocalConfiguration.current.screenWidthDp
-    val view = remember(widthDp) {
-        BannerAdView(context).apply {
-            setAdSize(BannerAdSize.sticky(context, widthDp))
-            setBannerAdEventListener(object : BannerAdEventListener {
-                override fun onAdLoaded() = Unit
-                override fun onAdFailedToLoad(error: AdRequestError) = Unit
-                override fun onAdClicked() = Unit
-                override fun onImpression(impressionData: ImpressionData?) = Unit
-            })
-            loadAd(AdRequest.Builder(AdIds.BANNER).build())
+    val density = LocalDensity.current
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        val widthDp = maxWidth.value.toInt().coerceAtLeast(1)
+        key(context, widthDp) {
+            val size = remember { BannerAdSize.sticky(context, widthDp) }
+            val slotHeight = with(density) { size.getHeightInPixels(context).toDp() }
+            var loaded by remember { mutableStateOf(false) }
+            val opacity by animateFloatAsState(
+                targetValue = if (loaded) 1f else 0f,
+                animationSpec = tween(450),
+                label = "bannerAppearance",
+            )
+            val view = remember { BannerAdView(context).apply { setAdSize(size) } }
+            DisposableEffect(view) {
+                view.setBannerAdEventListener(object : BannerAdEventListener {
+                    override fun onAdLoaded() { loaded = true }
+                    override fun onAdFailedToLoad(error: AdRequestError) { loaded = false }
+                    override fun onAdClicked() = Unit
+                    override fun onImpression(impressionData: ImpressionData?) = Unit
+                })
+                view.loadAd(AdRequest.Builder(AdIds.BANNER).build())
+                onDispose {
+                    view.setBannerAdEventListener(null)
+                    view.destroy()
+                }
+            }
+            // Слот остаётся и при ошибке загрузки, чтобы контент не прыгал обратно.
+            Box(Modifier.fillMaxWidth().height(slotHeight), contentAlignment = Alignment.Center) {
+                AndroidView(
+                    factory = { view },
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = opacity },
+                )
+            }
         }
     }
-    DisposableEffect(view) { onDispose { view.destroy() } }
-    AndroidView(factory = { view }, modifier = modifier.fillMaxWidth())
 }
