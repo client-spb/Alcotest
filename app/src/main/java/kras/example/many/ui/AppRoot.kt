@@ -2,6 +2,7 @@ package kras.example.many.ui
 
 import android.app.Activity
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -61,6 +62,16 @@ enum class Tab(val title: String, val icon: ImageVector) {
 fun AppRoot(activity: Activity) {
     val c = Ui.c
     var tab by rememberSaveable { mutableStateOf(Tab.CALC) }
+
+    BackHandler(enabled = AppStore.onboarded &&
+        (AppStore.calculating || tab != Tab.CALC || AppStore.step != AppStore.STEP_START)) {
+        when {
+            AppStore.calculating -> Unit
+            tab != Tab.CALC -> tab = Tab.CALC
+            AppStore.step == AppStore.STEP_RESULT -> AppStore.step = AppStore.STEP_START
+            AppStore.step > AppStore.STEP_START -> AppStore.step--
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(c.bg)) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {

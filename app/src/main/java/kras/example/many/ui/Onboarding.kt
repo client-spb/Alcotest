@@ -1,5 +1,6 @@
 package kras.example.many.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
@@ -53,6 +54,8 @@ fun Onboarding() {
     var age by rememberSaveable { mutableIntStateOf(start.age) }
     var weight by rememberSaveable { mutableIntStateOf(start.weightKg) }
     var height by rememberSaveable { mutableIntStateOf(start.heightCm) }
+
+    BackHandler(enabled = page > 0) { page-- }
 
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
