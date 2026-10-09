@@ -59,7 +59,7 @@ fun SettingsTab(onShareApp: () -> Unit, onRate: () -> Unit) {
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Настройки")
-        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Column {
                 SectionLabel("Ваши данные")
                 Panel(Modifier.fillMaxWidth(), padding = PaddingValues(0.dp)) {

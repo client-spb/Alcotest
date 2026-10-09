@@ -62,7 +62,7 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
                         Box(Modifier.weight(1f)) { StepTime() }
                     }
                     else -> {
-                        StepHeader(null, "Результат", "Обновляется каждые 30 секунд")
+                        StepHeader(null, "Результат расчёта", "Текущая оценка и почасовой прогноз")
                         Box(Modifier.weight(1f)) { StepResult(onShare) }
                     }
                 }
@@ -97,8 +97,9 @@ fun CalcScreen(activity: Activity, onShare: (Forecast) -> Unit) {
 private fun StartScreen() {
     val c = Ui.c
     val p = AppStore.profile
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center) {
-        T("Алкотестер", 32.sp, FontWeight.SemiBold)
+    Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.Center) {
+        T("ПЕРСОНАЛЬНЫЙ РАСЧЁТ", 12.sp, FontWeight.Medium, c.textDim)
+        T("Алкотестер", 30.sp, FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
         T(
             "Узнайте, сколько промилле в крови сейчас, когда можно за руль и когда алкоголь полностью выведется.",
             15.sp, color = c.textDim, modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
@@ -123,7 +124,7 @@ private fun StartScreen() {
 @Composable
 private fun StepHeader(number: Int?, title: String, hint: String) {
     val c = Ui.c
-    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 16.dp)) {
+    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 12.dp)) {
         if (number != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 repeat(2) { i ->

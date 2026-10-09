@@ -10,16 +10,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,6 +33,7 @@ import kras.example.many.core.BacEngine
 import kras.example.many.core.SessionRecord
 import kras.example.many.ui.EmptyState
 import kras.example.many.ui.InfoDialog
+import kras.example.many.ui.IconBtn
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
 import kras.example.many.ui.ScreenHeader
@@ -59,6 +58,7 @@ fun HistoryTab(onNewTest: () -> Unit) {
     var detail by remember { mutableStateOf<SessionRecord?>(null) }
     var showAll by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
+    var page by remember { mutableIntStateOf(0) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("История", "Все ваши расчёты")
@@ -97,11 +97,18 @@ fun HistoryTab(onNewTest: () -> Unit) {
     detail?.let { DetailSheet(it) { detail = null } }
     if (showAll) {
         Sheet({ showAll = false }, "Все расчёты") {
-            LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                itemsIndexed(history) { i, r ->
+            val pages = ((history.size + VISIBLE_ROWS - 1) / VISIBLE_ROWS).coerceAtLeast(1)
+            val currentPage = page.coerceIn(0, pages - 1)
+            Column {
+                history.drop(currentPage * VISIBLE_ROWS).take(VISIBLE_ROWS).forEachIndexed { i, r ->
                     if (i > 0) HorizontalDivider(color = c.line)
                     HistoryRow(r) { showAll = false; detail = r }
                 }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconBtn(Sym.Back, { page = (currentPage - 1).coerceAtLeast(0) }, description = "Предыдущая страница")
+                T("${currentPage + 1} / $pages", 13.sp, modifier = Modifier.weight(1f), align = TextAlign.Center)
+                IconBtn(Sym.Next, { page = (currentPage + 1).coerceAtMost(pages - 1) }, description = "Следующая страница")
             }
             Box(Modifier.size(16.dp))
             PrimaryButton("Очистить историю", { confirmClear = true }, Modifier.fillMaxWidth(), danger = true)

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kras.example.many.ui.theme.Ui
+import kras.example.many.ui.theme.OfficeFont
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,8 +50,8 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
-val CardShape = RoundedCornerShape(12.dp)
-val ControlShape = RoundedCornerShape(10.dp)
+val CardShape = RoundedCornerShape(8.dp)
+val ControlShape = RoundedCornerShape(6.dp)
 
 @Composable
 fun T(
@@ -62,7 +63,7 @@ fun T(
     align: TextAlign = TextAlign.Start,
     maxLines: Int = Int.MAX_VALUE,
 ) = Text(
-    text = text, fontSize = size, fontWeight = weight, color = color, modifier = modifier,
+    text = text, fontSize = size, fontWeight = weight, fontFamily = OfficeFont, color = color, modifier = modifier,
     textAlign = align, maxLines = maxLines, overflow = TextOverflow.Ellipsis, lineHeight = size * 1.25f,
 )
 
@@ -124,7 +125,7 @@ fun PrimaryButton(
     val border = when { danger -> c.bad; secondary -> c.line; else -> c.accent }
     Box(
         modifier
-            .height(52.dp)
+            .height(48.dp)
             .clip(ControlShape)
             .background(bg)
             .border(1.dp, border, ControlShape)
@@ -284,7 +285,7 @@ fun RowScope.StatTile(
 fun SettingRow(title: String, value: String, onClick: () -> Unit) {
     val c = Ui.c
     Row(
-        Modifier.fillMaxWidth().height(52.dp).clickable(onClick = onClick).padding(horizontal = 16.dp),
+        Modifier.fillMaxWidth().height(46.dp).clickable(onClick = onClick).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         T(title, 15.sp, modifier = Modifier.weight(1f))

@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
@@ -35,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import kras.example.many.core.AppStore
 import kras.example.many.core.DrinkType
 import kras.example.many.ui.ControlShape
+import kras.example.many.ui.IconBtn
 import kras.example.many.ui.InfoDialog
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
@@ -54,6 +53,7 @@ fun StepDrinks() {
     val c = Ui.c
     var addType by remember { mutableStateOf<DrinkType?>(null) }
     var askMore by remember { mutableStateOf(false) }
+    var drinkPage by remember { mutableIntStateOf(0) }
     val draft = AppStore.draft
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
@@ -75,16 +75,21 @@ fun StepDrinks() {
             if (draft.isEmpty()) {
                 T("Пока ничего — выберите напиток выше", 14.sp, color = c.textDim)
             } else {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(draft, key = { it.id }) { d ->
-                        Row(
-                            Modifier.height(40.dp).clip(ControlShape).background(c.surfaceHigh)
-                                .clickable { AppStore.removeDraft(d.id) }.padding(start = 12.dp, end = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            T("${d.type.title} ${d.count} × ${fmtVolume(d.volumeMl)}", 13.sp, FontWeight.Medium)
-                            Icon(Sym.Close, "Убрать", tint = c.textDim, modifier = Modifier.padding(start = 4.dp).size(16.dp))
-                        }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val index = drinkPage.coerceIn(0, draft.lastIndex)
+                    val d = draft[index]
+                    Row(
+                        Modifier.weight(1f).height(40.dp).clip(ControlShape).background(c.surfaceHigh)
+                            .clickable { AppStore.removeDraft(d.id) }.padding(start = 12.dp, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        T("${d.type.title} ${d.count} × ${fmtVolume(d.volumeMl)}", 13.sp, FontWeight.Medium, modifier = Modifier.weight(1f), maxLines = 1)
+                        Icon(Sym.Close, "Убрать", tint = c.textDim, modifier = Modifier.padding(start = 4.dp).size(16.dp))
+                    }
+                    if (draft.size > 1) {
+                        IconBtn(Sym.Back, { drinkPage = (index - 1 + draft.size) % draft.size }, size = 40.dp, description = "Предыдущий напиток")
+                        T("${index + 1}/${draft.size}", 12.sp, color = c.textDim)
+                        IconBtn(Sym.Next, { drinkPage = (index + 1) % draft.size }, size = 40.dp, description = "Следующий напиток")
                     }
                 }
             }

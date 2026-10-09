@@ -119,7 +119,9 @@ private fun BottomBar(selected: Tab, onSelect: (Tab) -> Unit) {
                 val active = t == selected
                 val color = if (active) c.accent else c.textDim
                 Column(
-                    Modifier.weight(1f).height(60.dp).clickable { onSelect(t) },
+                    Modifier.weight(1f).height(60.dp).padding(horizontal = 6.dp, vertical = 6.dp)
+                        .clip(ControlShape).background(if (active) c.surfaceHigh else c.surface)
+                        .clickable { onSelect(t) },
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {

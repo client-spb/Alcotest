@@ -41,4 +41,32 @@ class BacEngineTest {
         val f = BacEngine.compute(drinks, profile, Stomach.SNACK, t0)
         assertTrue(f.driveMs!! <= f.soberMs!!)
     }
+
+    @Test
+    fun hourlyForecastStartsAtMeasurementAndEndsAtSoberTime() {
+        val now = t0 + 2 * hour
+        val f = BacEngine.compute(listOf(DrinkEntry(1, DrinkType.SPIRITS, 250, 40f, t0)), profile, Stomach.EMPTY, now)
+        val rows = f.hourlyFrom(now)
+        assertEquals(BacPoint(now, f.current), rows.first())
+        assertEquals(f.soberMs, rows.last().timeMs)
+        assertEquals(0f, rows.last().promille, 0.0001f)
+        rows.dropLast(1).forEachIndexed { i, point -> assertEquals(now + i * hour, point.timeMs) }
+        assertTrue(rows.zipWithNext().all { (a, b) -> a.timeMs < b.timeMs && a.promille >= b.promille })
+    }
+
+    @Test
+    fun hourlyForecastIncludesRisingAbsorption() {
+        val now = t0 + 10 * 60_000L
+        val f = BacEngine.compute(listOf(DrinkEntry(1, DrinkType.SPIRITS, 250, 40f, t0)), profile, Stomach.FULL, now)
+        val rows = f.hourlyFrom(now)
+        assertTrue(rows[1].promille > rows.first().promille)
+    }
+
+    @Test
+    fun hourlyForecastForPastSessionHasOnlyCurrentRow() {
+        val now = t0 + 24 * hour
+        val f = BacEngine.compute(listOf(DrinkEntry(1, DrinkType.BEER, 500, 5f, t0)), profile, Stomach.EMPTY, now)
+        assertEquals(listOf(BacPoint(now, 0f)), f.hourlyFrom(now))
+        assertTrue(Forecast.EMPTY.hourlyFrom(now).isEmpty())
+    }
 }

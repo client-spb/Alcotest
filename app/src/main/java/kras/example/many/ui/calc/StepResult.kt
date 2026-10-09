@@ -2,6 +2,13 @@ package kras.example.many.ui.calc
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,9 +32,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -37,6 +41,7 @@ import kras.example.many.core.AppStore
 import kras.example.many.core.BacEngine
 import kras.example.many.core.Forecast
 import kras.example.many.ui.InfoDialog
+import kras.example.many.ui.ControlShape
 import kras.example.many.ui.Panel
 import kras.example.many.ui.PrimaryButton
 import kras.example.many.ui.StatTile
@@ -69,9 +74,9 @@ fun StepResult(onShare: (Forecast) -> Unit) {
 
     Column(Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Panel(Modifier.fillMaxWidth()) {
-            T("Сейчас в крови", 13.sp, color = c.textDim)
+            T("КОНЦЕНТРАЦИЯ · ${fmtTime(nowMs)}", 12.sp, FontWeight.Medium, c.textDim)
             Row(verticalAlignment = Alignment.Bottom) {
-                T(fmtPromille(forecast.current), 44.sp, FontWeight.SemiBold)
+                T(fmtPromille(forecast.current), 36.sp, FontWeight.SemiBold)
                 T(" ‰", 18.sp, color = c.textDim, modifier = Modifier.padding(bottom = 8.dp))
             }
             LevelBar(forecast.current)
@@ -83,21 +88,21 @@ fun StepResult(onShare: (Forecast) -> Unit) {
             val canDrive = drive == null || drive <= nowMs
             StatTile(
                 "За руль",
-                if (canDrive) "Можно*" else fmtDayTime(drive!!),
+                if (canDrive) "Можно*" else fmtTime(drive!!),
                 if (canDrive) "ниже $limit ‰" else "через ${fmtDuration(drive!! - nowMs)}",
                 if (canDrive) c.good else c.warn,
             ) { tip = Tip.DRIVE }
             val sober = forecast.soberMs
             StatTile(
                 "Трезвость",
-                if (sober == null) "—" else if (sober <= nowMs) "Уже" else fmtDayTime(sober),
+                if (sober == null) "—" else if (sober <= nowMs) "Уже" else fmtTime(sober),
                 if (sober == null || sober <= nowMs) "0,00 ‰" else "через ${fmtDuration(sober - nowMs)}",
             ) { tip = Tip.SOBER }
         }
         Panel(Modifier.fillMaxWidth().weight(1f), padding = PaddingValues(14.dp)) {
-            T("Снижение концентрации", 14.sp, FontWeight.Medium)
-            T("пунктир — лимит $limit ‰", 12.sp, color = c.textDim)
-            if (!forecast.isEmpty) Chart(forecast, nowMs, limit, Modifier.fillMaxWidth().weight(1f).padding(top = 8.dp))
+            T("Почасовой прогноз", 14.sp, FontWeight.SemiBold)
+            T("От текущего времени до полного выведения", 12.sp, color = c.textDim)
+            HourlyList(forecast, nowMs, Modifier.fillMaxWidth().weight(1f).padding(top = 10.dp))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             PrimaryButton("Поделиться", { onShare(forecast) }, Modifier.weight(1f), secondary = true)
@@ -131,35 +136,43 @@ private fun LevelBar(value: Float) {
 }
 
 @Composable
-private fun Chart(f: Forecast, nowMs: Long, limit: Float, modifier: Modifier) {
+private fun HourlyList(f: Forecast, nowMs: Long, modifier: Modifier) {
     val c = Ui.c
-    val start = f.points.first().timeMs
-    val end = f.points.last().timeMs
-    Column(modifier) {
-        Canvas(Modifier.fillMaxWidth().weight(1f)) {
-            val maxY = maxOf(f.peak, limit) * 1.2f + 0.05f
-            val span = (end - start).coerceAtLeast(1L).toFloat()
-            fun x(t: Long) = (t - start) / span * size.width
-            fun y(v: Float) = size.height - v / maxY * size.height
-
-            drawLine(c.line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
-            val line = Path()
-            f.points.forEachIndexed { i, p -> if (i == 0) line.moveTo(x(p.timeMs), y(p.promille)) else line.lineTo(x(p.timeMs), y(p.promille)) }
-            drawPath(line, c.accent, style = Stroke(2.dp.toPx()))
-
-            val ly = y(limit)
-            drawLine(c.warn, Offset(0f, ly), Offset(size.width, ly), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f)))
-
-            if (nowMs in start..end) {
-                val nx = x(nowMs)
-                drawLine(c.textDim, Offset(nx, 0f), Offset(nx, size.height), 1.dp.toPx())
-                drawCircle(c.accent, 4.dp.toPx(), Offset(nx, y(f.current)))
+    val rows = remember(f, nowMs) { f.hourlyFrom(nowMs) }
+    val scroll = rememberLazyListState()
+    Row(modifier) {
+        LazyColumn(Modifier.weight(1f).clip(ControlShape), state = scroll) {
+            itemsIndexed(rows, key = { index, _ -> index }) { index, point ->
+                Row(
+                    Modifier.fillMaxWidth().background(if (index == 0) c.surfaceHigh else c.surface)
+                        .padding(horizontal = 10.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        T(fmtDayTime(point.timeMs), 14.sp, FontWeight.Medium, maxLines = 1)
+                        T(if (index == 0) "Сейчас" else if (point.timeMs == f.soberMs) "Полное выведение" else "+${index} ч",
+                            11.sp, color = c.textDim, maxLines = 1)
+                    }
+                    T("${fmtPromille(point.promille)} ‰", 17.sp, FontWeight.SemiBold)
+                }
+                if (index < rows.lastIndex) HorizontalDivider(color = c.line)
             }
         }
-        Row(Modifier.padding(top = 6.dp)) {
-            T(fmtTime(start), 11.sp, color = c.textDim, modifier = Modifier.weight(1f))
-            T("сейчас ${fmtTime(nowMs)}", 11.sp, FontWeight.Medium, c.text, Modifier.weight(1f), TextAlign.Center)
-            T(fmtTime(end), 11.sp, color = c.textDim, modifier = Modifier.weight(1f), align = TextAlign.End)
+        // Постоянная полоса прокрутки только внутри окна прогноза.
+        Canvas(Modifier.padding(start = 8.dp).width(3.dp).fillMaxHeight()
+            .semantics { contentDescription = "Полоса прокрутки почасового прогноза" }) {
+            val info = scroll.layoutInfo
+            if ((scroll.canScrollForward || scroll.canScrollBackward) && info.visibleItemsInfo.isNotEmpty()) {
+                drawRoundRect(c.line, cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width))
+                val rowHeight = info.visibleItemsInfo.first().size.coerceAtLeast(1)
+                val totalHeight = info.totalItemsCount * rowHeight.toFloat()
+                val viewport = (info.viewportEndOffset - info.viewportStartOffset).toFloat()
+                val thumb = (size.height * viewport / totalHeight).coerceIn(18.dp.toPx().coerceAtMost(size.height), size.height)
+                val offset = (scroll.firstVisibleItemIndex * rowHeight + scroll.firstVisibleItemScrollOffset).toFloat()
+                val top = (size.height - thumb) * (offset / (totalHeight - viewport).coerceAtLeast(1f)).coerceIn(0f, 1f)
+                drawRoundRect(c.textDim, topLeft = Offset(0f, top), size = androidx.compose.ui.geometry.Size(size.width, thumb),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(size.width))
+            }
         }
     }
 }

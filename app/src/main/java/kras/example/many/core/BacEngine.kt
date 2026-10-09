@@ -17,6 +17,31 @@ data class Forecast(
 ) {
     val isEmpty get() = points.isEmpty()
 
+    /** Почасовой прогноз от момента измерения, с точной последней отметкой выведения. */
+    fun hourlyFrom(timeMs: Long): List<BacPoint> {
+        if (isEmpty) return emptyList()
+        val end = soberMs ?: points.last().timeMs
+        val result = arrayListOf(BacPoint(timeMs, current))
+        if (end <= timeMs) return result
+        var next = timeMs + 3_600_000L
+        while (next < end) {
+            val right = points.indexOfFirst { it.timeMs >= next }
+            val value = when {
+                right <= 0 -> points.first().promille
+                else -> {
+                    val a = points[right - 1]
+                    val b = points[right]
+                    val fraction = (next - a.timeMs).toFloat() / (b.timeMs - a.timeMs)
+                    a.promille + (b.promille - a.promille) * fraction
+                }
+            }
+            result += BacPoint(next, value.coerceAtLeast(0f))
+            next += 3_600_000L
+        }
+        result += BacPoint(end, points.last().promille)
+        return result
+    }
+
     companion object {
         val EMPTY = Forecast(emptyList(), 0f, 0f, 0L, null, null)
     }
